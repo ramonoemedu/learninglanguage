@@ -1,0 +1,53 @@
+{
+  "name": "learninglanguage",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.992.0",
+    "@heroui/react": "^2.6.14",
+    "@prisma/client": "6.2.0",
+    "@sentry/nextjs": "^7.120.0",
+    "@sentry/node": "^7.120.0",
+    "@sentry/react": "^7.120.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.48.1",
+    "@upstash/redis": "^1.34.4",
+    "clsx": "^2.1.1",
+    "form-data": "^4.0.5",
+    "framer-motion": "^12.4.3",
+    "lucide-react": "^0.475.0",
+    "next": "^14.0.0",
+    "next-themes": "^0.4.4",
+    "openai": "^4.85.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "resend": "^4.1.2",
+    "tailwind-merge": "^3.0.1",
+    "zod": "^3.24.2",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^20.19.33",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "autoprefixer": "^10.4.24",
+    "babel-plugin-react-compiler": "^19.0.0-beta-df7b47d-20241124",
+    "dotenv-cli": "^11.0.0",
+    "postcss": "^8",
+    "prisma": "6.2.0",
+    "tailwindcss": "^4.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

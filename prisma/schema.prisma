@@ -1,0 +1,184 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String
+  role           String   @default("learner") // learner | admin | tester
+  plan           String   @default("free")    // free | pro | tester
+  nativeLanguage String   @default("en")
+  xpTotal        Int      @default(0)
+  coins          Int      @default(0)
+  streakDays     Int      @default(0)
+  streakLastDate DateTime?
+  streakFreezeActive Boolean @default(false)
+  avatarUrl      String?
+  createdAt      DateTime @default(now())
+
+  // Relations
+  userLanguages    UserLanguage[]
+  progress         UserProgress[]
+  achievements     UserAchievement[]
+  vocabulary       UserVocabulary[]
+  coinTransactions CoinTransaction[]
+  xpTransactions   XPTransaction[]
+  leaderboardEntries LeaderboardEntry[]
+}
+
+model Language {
+  id      String  @id @default(cuid())
+  code    String  @unique  // 'zh', 'en', 'km'
+  name    String           // 'Chinese (Mandarin)'
+  flag    String           // '🇨🇳'
+  active  Boolean @default(true)
+  stages  Stage[]
+  leaderboardEntries LeaderboardEntry[]
+  vocabulary Vocabulary[] // Added back-relation
+  userLanguages    UserLanguage[]
+}
+
+model UserLanguage {
+  id            String   @id @default(cuid())
+  userId        String
+  languageCode  String
+  language      Language @relation(fields: [languageCode], references: [code])
+  currentStage  Int      @default(1)
+  currentChapter Int     @default(1)
+  xpInLanguage  Int      @default(0)
+  startedAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, languageCode])
+}
+
+model Stage {
+  id           String   @id @default(cuid())
+  languageId   String
+  stageNumber  Int      // 1-10
+  title        String   // 'Baby', 'Toddler', etc.
+  unlockXp     Int      @default(0)
+  language     Language @relation(fields: [languageId], references: [id])
+  chapters     Chapter[]
+}
+
+model Chapter {
+  id         String   @id @default(cuid())
+  stageId    String
+  chapterNum Int      // 1-5
+  title      String
+  stage      Stage    @relation(fields: [stageId], references: [id])
+  lessons    Lesson[]
+}
+
+model Lesson {
+  id          String  @id @default(cuid())
+  chapterId   String
+  type        String  // vocab | grammar | listen | speak | write | read
+  contentJson Json    // lesson content (questions, answers, audio refs)
+  xpReward    Int     @default(10)
+  coinReward  Int     @default(5)
+  chapter     Chapter @relation(fields: [chapterId], references: [id])
+  progress    UserProgress[]
+}
+
+model Vocabulary {
+  id            String  @id @default(cuid())
+  languageId    String
+  language      Language @relation(fields: [languageId], references: [id])
+  word          String  // '你好'
+  romanization  String  // 'nǐ hǎo'
+  ipa           String? // phonetic
+  translation   String  // 'Hello'
+  audioUrl      String? // Cloudflare R2 URL
+  imageUrl      String?
+  difficulty    Int     @default(1) // 1-5
+  userVocabs    UserVocabulary[]
+}
+
+model UserProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  lessonId    String
+  score       Int      // 0-100
+  xpEarned    Int
+  completedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+  lesson      Lesson   @relation(fields: [lessonId], references: [id])
+}
+
+model UserVocabulary {
+  userId         String
+  vocabId        String
+  timesCorrect   Int      @default(0)
+  timesSeen      Int      @default(0)
+  nextReviewAt   DateTime @default(now()) // SM-2 schedule
+  confidenceLevel Int     @default(0) // 0-5
+  user           User     @relation(fields: [userId], references: [id])
+  vocabulary     Vocabulary @relation(fields: [vocabId], references: [id])
+
+  @@id([userId, vocabId])
+}
+
+model Achievement {
+  id          String  @id @default(cuid())
+  title       String
+  description String
+  icon        String
+  category    String
+  xpReward    Int
+  coinReward  Int
+  condition   Json
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+
+  @@id([userId, achievementId])
+}
+
+model CoinTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  type      String   // earn | spend
+  reason    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model XPTransaction {
+  id         String   @id @default(cuid())
+  userId     String
+  amount     Int
+  reason     String
+  sourceType String
+  sourceId   String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model LeaderboardEntry {
+  userId        String
+  languageCode  String
+  weekStart     DateTime
+  xpEarned      Int      @default(0)
+  user          User     @relation(fields: [userId], references: [id])
+  language      Language @relation(fields: [languageCode], references: [code])
+
+  @@id([userId, languageCode, weekStart])
+}
