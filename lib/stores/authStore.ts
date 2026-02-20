@@ -1,6 +1,20 @@
 // lib/stores/authStore.ts
 import { create } from 'zustand'
 
+interface Language {
+  name: string
+  flag: string
+}
+
+interface EnrolledLanguage {
+  id: string
+  languageCode: string
+  currentStage: number
+  currentChapter: number
+  xpInLanguage: number
+  language: Language
+}
+
 interface User {
   id: string
   name: string
@@ -9,6 +23,10 @@ interface User {
   nativeLanguage?: string
   role?: string
   plan?: string
+  streakDays: number
+  coins: number
+  xpTotal: number
+  enrolledLanguages: EnrolledLanguage[]
 }
 
 interface UserStore {

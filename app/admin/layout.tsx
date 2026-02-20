@@ -24,30 +24,39 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar>
+      <Navbar maxWidth="full" className="border-b border-border bg-card/80 backdrop-blur-md">
         <NavbarBrand>
-          <Link href="/admin">
-            <p className="font-bold text-inherit">Admin Panel</p>
+          <Link href="/admin" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-warning rounded-lg flex items-center justify-center shadow-sm">
+              <span className="text-white font-black text-xl">A</span>
+            </div>
+            <p className="font-black text-foreground uppercase tracking-wider">Admin Panel</p>
           </Link>
         </NavbarBrand>
-        <NavbarContent className="hidden sm:flex gap-4" justify="center">
-          {navLinks.map(link => (
-            <NavbarItem key={link.href} isActive={pathname === link.href}>
-              <Link href={link.href}>
-                {link.label}
-              </Link>
-            </NavbarItem>
-          ))}
+        <NavbarContent className="hidden lg:flex gap-6" justify="center">
+          {navLinks.map(link => {
+            const isActive = pathname === link.href || (link.href !== '/admin' && pathname.startsWith(link.href))
+            return (
+              <NavbarItem key={link.href} isActive={isActive}>
+                <Link 
+                  href={link.href}
+                  className={`text-sm font-bold uppercase tracking-tight transition-colors ${isActive ? 'text-primary' : 'text-default-500 hover:text-foreground'}`}
+                >
+                  {link.label}
+                </Link>
+              </NavbarItem>
+            )
+          })}
         </NavbarContent>
         <NavbarContent justify="end">
           <NavbarItem>
-            <Button as={Link} color="primary" href="/dashboard" variant="flat">
-              Back to App
+            <Button as={Link} color="primary" href="/dashboard" variant="flat" className="font-bold uppercase text-xs">
+              Exit to App
             </Button>
           </NavbarItem>
         </NavbarContent>
       </Navbar>
-      <main className="p-8">
+      <main className="max-w-7xl mx-auto p-6 sm:p-10">
         {children}
       </main>
     </div>

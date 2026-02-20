@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server'
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -15,7 +15,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = await params
+    const { id } = params
 
     const lesson = await prisma.lesson.findUnique({
       where: { id },

@@ -2,8 +2,9 @@
 'use client'
 
 import { Button, Card, CardBody, Progress, Spinner } from '@heroui/react'
-import { Mic, StopCircle, CheckCircle2, AlertCircle, Volume2 } from 'lucide-react'
+import { Mic, StopCircle, CheckCircle2, AlertCircle, Volume2, Sparkles, Activity, Headphones, Play } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface SpeakingProps {
   question: {
@@ -24,15 +25,41 @@ export default function Speaking({ question, onAnswer, disabled }: SpeakingProps
   const [feedback, setFeedback] = useState<{ score: number, transcript: string, feedback: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [isPlayingNative, setIsPlayingNative] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  useEffect(() => {
-    if (audioBlob) {
-      if (audioRef.current) {
-        audioRef.current.src = URL.createObjectURL(audioBlob)
+  const playNativeAudio = async () => {
+    if (isPlayingNative) return
+    setIsPlayingNative(true)
+    try {
+      const res = await fetch('/api/ai/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: question.correctAnswer, 
+          voice: 'nova',
+          speed: 1,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.audioUrl) {
+        const audio = new Audio(data.audioUrl)
+        audio.onended = () => setIsPlayingNative(false)
+        audio.play()
       }
+    } catch (err) {
+      console.error('TTS error:', err)
+      setIsPlayingNative(false)
     }
-  }, [audioBlob])
+  }
+
+  // 🔊 AUTO-PLAY ON MOUNT
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      playNativeAudio()
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [question.correctAnswer])
 
   const startRecording = async () => {
     setFeedback(null)
@@ -57,15 +84,14 @@ export default function Speaking({ question, onAnswer, disabled }: SpeakingProps
       setRecording(true)
       setMediaRecorder(recorder)
     } catch (err) {
-      console.error('Error starting recording:', err)
-      setError('Could not access microphone. Please ensure permissions are granted.')
+      setError('Neural sensor blocked. Check mic permissions.')
     }
   }
 
   const stopRecording = () => {
     if (mediaRecorder) {
       mediaRecorder.stop()
-      mediaRecorder.stream.getTracks().forEach(track => track.stop()); // Stop microphone access
+      mediaRecorder.stream.getTracks().forEach(track => track.stop())
     }
   }
 
@@ -78,20 +104,13 @@ export default function Speaking({ question, onAnswer, disabled }: SpeakingProps
       formData.append('targetText', question.correctAnswer)
       formData.append('language', question.languageCode)
 
-      const res = await fetch('/api/ai/pronounce', {
-        method: 'POST',
-        body: formData,
-      })
-
+      const res = await fetch('/api/ai/pronounce', { method: 'POST', body: formData })
       const data = await res.json()
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to get pronunciation feedback.')
-      }
+      if (!res.ok) throw new Error(data.error || 'Signal analysis failed.')
       setFeedback(data)
-      onAnswer(data.transcript) // Pass the transcript as the user's answer
+      onAnswer(data.transcript)
     } catch (err: any) {
-      console.error('Error sending audio:', err)
       setError(err.message)
       setFeedback(null)
     } finally {
@@ -99,71 +118,104 @@ export default function Speaking({ question, onAnswer, disabled }: SpeakingProps
     }
   }
 
-  const playCorrectAudio = async () => {
-    // Implement playing the correct audio here, similar to FlashCard component
-    // Could use question.audioUrl if pre-generated or call /api/ai/tts
-    // For now, simple console log
-    console.log("Playing correct pronunciation audio for:", question.correctAnswer)
-  }
-
   return (
-    <div className="w-full flex flex-col items-center gap-10 animate-in fade-in duration-500">
-      <h2 className="text-2xl font-bold">{question.prompt}</h2>
+    <div className="w-full flex flex-col items-center gap-8 animate-in fade-in zoom-in-95 duration-700">
+      
+      {/* HUD Label */}
+      <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+        <Activity size={12} className="text-indigo-500 animate-pulse" />
+        <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.3em]">Vocal Calibration</span>
+      </div>
 
-      <Card className="w-full min-h-[150px] border-2 border-default-100 bg-default-50/50 shadow-none flex flex-col items-center justify-center p-10">
-        <span className="text-5xl mb-2 font-black">{question.correctAnswer}</span>
-        {question.romanization && <p className="text-default-400 text-xl">{question.romanization}</p>}
-        
-        <div className="mt-6 flex gap-4">
-            <Button 
-                size="sm" 
-                variant="flat" 
-                color="secondary" 
-                startContent={<Volume2 size={18} />}
-                onClick={playCorrectAudio}
-                isDisabled={disabled}
-            >
-                Hear Native
-            </Button>
-            {recording ? (
-                <Button 
-                    color="danger" 
-                    onClick={stopRecording} 
-                    startContent={<StopCircle size={24} />} 
-                    isDisabled={disabled}
+      <Card className="w-full max-w-lg bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-3xl border border-slate-200 dark:border-slate-800 shadow-2xl rounded-[40px] overflow-hidden">
+        <CardBody className="flex flex-col items-center justify-center p-10 sm:p-16">
+          
+          <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em] mb-8">Target Sequence</h2>
+
+          {/* 1. PRONUNCIATION HIERARCHY */}
+          <motion.p 
+            animate={{ scale: isPlayingNative ? 1.05 : 1 }}
+            className="text-sky-500 dark:text-sky-400 text-3xl sm:text-4xl font-black mb-4 tracking-tight"
+          >
+            {question.romanization}
+          </motion.p>
+
+          <span className="text-6xl sm:text-7xl font-black text-slate-900 dark:text-white mb-12">
+            {question.correctAnswer}
+          </span>
+          
+          {/* 2. THE SHADOWING CONSOLE */}
+          <div className="flex items-center gap-8">
+            <div className="flex flex-col items-center gap-2">
+              <button 
+                onClick={playNativeAudio}
+                className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${isPlayingNative ? 'bg-sky-500 shadow-[0_0_20px_rgba(56,189,248,0.5)]' : 'bg-slate-100 dark:bg-slate-800 hover:bg-sky-500/10'}`}
+              >
+                <Volume2 className={isPlayingNative ? 'text-white' : 'text-sky-500'} size={24} />
+                {isPlayingNative && <span className="absolute inset-0 rounded-full border-2 border-sky-500 animate-ping opacity-40" />}
+              </button>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Listen</span>
+            </div>
+
+            <div className="h-12 w-[1px] bg-slate-200 dark:bg-slate-800" />
+
+            <div className="flex flex-col items-center gap-2">
+              {recording ? (
+                <button 
+                  onClick={stopRecording}
+                  className="relative w-20 h-20 rounded-full bg-rose-500 flex items-center justify-center shadow-[0_0_30px_rgba(244,63,94,0.4)] animate-pulse"
                 >
-                    Stop Recording
-                </Button>
-            ) : (
-                <Button 
-                    color="primary" 
-                    onClick={startRecording} 
-                    startContent={loading ? <Spinner size="sm" color="white" /> : <Mic size={24} />} 
-                    isDisabled={disabled || loading}
+                  <StopCircle className="text-white" size={32} />
+                  <div className="absolute inset-[-8px] rounded-full border-2 border-rose-500/30 animate-ping" />
+                </button>
+              ) : (
+                <button 
+                  onClick={startRecording}
+                  disabled={loading || disabled}
+                  className="w-20 h-20 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-[0_0_30px_rgba(56,189,248,0.4)] hover:shadow-[0_0_40px_rgba(56,189,248,0.6)] hover:-translate-y-1 transition-all disabled:opacity-50"
                 >
-                    {loading ? 'Analyzing...' : 'Start Recording'}
-                </Button>
-            )}
-        </div>
-        {error && <p className="text-sm text-danger mt-4">{error}</p>}
+                  {loading ? <Spinner color="white" /> : <Mic size={32} />}
+                </button>
+              )}
+              <span className="text-[9px] font-black text-sky-500 uppercase tracking-widest mt-1">Speak Now</span>
+            </div>
+          </div>
+
+          {error && (
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs font-bold text-rose-500 mt-8 uppercase tracking-widest flex items-center gap-2">
+              <AlertCircle size={14} /> {error}
+            </motion.p>
+          )}
+        </CardBody>
       </Card>
 
-      {feedback && (
-        <Card className="w-full mt-6 p-4">
-          <CardBody className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              {feedback.score >= 70 ? (
-                <CheckCircle2 size={24} className="text-success" />
-              ) : (
-                <AlertCircle size={24} className="text-danger" />
-              )}
-              <span className="font-bold text-xl">Score: {feedback.score}/100</span>
+      {/* 3. INTELLIGENT FEEDBACK */}
+      <AnimatePresence>
+        {feedback && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-lg p-6 rounded-3xl bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-slate-800 backdrop-blur-xl"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${feedback.score >= 70 ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+                  {feedback.score >= 70 ? <CheckCircle2 className="text-emerald-500" size={18} /> : <Activity className="text-amber-500" size={18} />}
+                </div>
+                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Signal Analysis</h3>
+              </div>
+              <span className={`text-2xl font-black ${feedback.score >= 70 ? 'text-emerald-500' : 'text-amber-500'}`}>{feedback.score}%</span>
             </div>
-            <p className="text-sm text-default-500">You said: "{feedback.transcript}"</p>
-            <p className="text-sm">{feedback.feedback}</p>
-          </CardBody>
-        </Card>
-      )}
+            
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Decoded Input</span>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">"{feedback.transcript}"</p>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed italic">{feedback.feedback}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

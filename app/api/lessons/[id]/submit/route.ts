@@ -11,7 +11,7 @@ const submitSchema = z.object({
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -21,7 +21,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: lessonId } = await params
+    const { id: lessonId } = params
     const body = await request.json()
     const { score, timeSpent } = submitSchema.parse(body)
 

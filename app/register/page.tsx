@@ -80,45 +80,45 @@ export default function RegisterPage() {
             <form onSubmit={handleRegister} className="space-y-4">
               <Input
                 type="text"
-                label="Name"
                 variant="bordered"
-                placeholder="John Doe"
+                placeholder="Name"
                 value={name}
                 onValueChange={setName}
                 startContent={<User className="text-default-400 w-4" />}
                 required
                 classNames={{
-                  label: "text-default-600",
                   input: "text-sm",
+                  innerWrapper: "h-full",
+                  inputWrapper: "h-12 border-default-200 hover:border-primary-300 group-data-[focus=true]:border-primary-500 group-data-[hover=true]:border-primary-300",
                 }}
               />
               <Input
                 type="email"
-                label="Email"
                 variant="bordered"
-                placeholder="you@example.com"
+                placeholder="Email"
                 value={email}
                 onValueChange={setEmail}
                 startContent={<Mail className="text-default-400 w-4" />}
                 required
                 classNames={{
-                  label: "text-default-600",
                   input: "text-sm",
+                  innerWrapper: "h-full",
+                  inputWrapper: "h-12 border-default-200 hover:border-primary-300 group-data-[focus=true]:border-primary-500 group-data-[hover=true]:border-primary-300",
                 }}
               />
               <Input
                 type="password"
-                label="Password"
                 variant="bordered"
-                placeholder="••••••••"
+                placeholder="Password"
                 value={password}
                 onValueChange={setPassword}
                 startContent={<Lock className="text-default-400 w-4" />}
                 description="At least 8 characters"
                 required
                 classNames={{
-                  label: "text-default-600",
                   input: "text-sm",
+                  innerWrapper: "h-full",
+                  inputWrapper: "h-12 border-default-200 hover:border-primary-300 group-data-[focus=true]:border-primary-500 group-data-[hover=true]:border-primary-300",
                   description: "text-[10px]"
                 }}
               />

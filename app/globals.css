@@ -6,13 +6,58 @@
 }
 
 @layer base {
+  /* AI Future - Light Mode (Clean, Icy High-Tech) */
   :root {
-    --background: #ffffff;
-    --foreground: #09090b;
+    --background: #f8fafc; /* slate-50: Very clean tech white */
+    --foreground: #0f172a; /* slate-900: Deep dark text */
+    --primary: #0284c7;    /* sky-600: Strong tech blue */
+    --secondary: #4f46e5;  /* indigo-600: AI Purple */
+    --accent: #c026d3;     /* fuchsia-600: Magenta accent */
+    --success: #10b981;    /* emerald-500: Clean green */
+    --warning: #f59e0b;    /* amber-500: System warning */
+    --danger: #e11d48;     /* rose-600: System error */
+    --info: #3b82f6;       /* blue-500: Neutral info */
   }
 
+  /* AI Future - Dark Mode (Deep Space & Neon - This is what your app will use) */
   .dark {
-    --background: #09090b;
-    --foreground: #fafafa;
+    --background: #030712; /* gray-950: The deep space background */
+    --foreground: #f8fafc; /* slate-50: Crisp, glowing white text */
+    --primary: #38bdf8;    /* sky-400: Glowing Neon Cyan (Your main color) */
+    --secondary: #818cf8;  /* indigo-400: Soft neon purple */
+    --accent: #e879f9;     /* fuchsia-400: AI Magenta */
+    --success: #34d399;    /* emerald-400: Neon success green */
+    --warning: #fbbf24;    /* amber-400: Neon warning yellow */
+    --danger: #fb7185;     /* rose-400: Neon error red */
+    --info: #60a5fa;       /* blue-400: Tech info blue */
   }
+
+  /* Ensures the whole app naturally adopts these colors without hardcoding */
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+/* ========================================= */
+/* CINEMATIC AI BACKGROUND ANIMATIONS        */
+/* ========================================= */
+@keyframes orb-breathe {
+  0%, 100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.1;
+  }
+  50% {
+    transform: scale(1.1) translate(2%, 2%);
+    opacity: 0.15; /* Slight intensity bump at the peak of the breath */
+  }
+}
+
+/* Utility classes to apply the breathing effect to your background orbs */
+.animate-orb-breathe {
+  animation: orb-breathe 15s ease-in-out infinite;
+}
+
+.animate-orb-breathe-reverse {
+  animation: orb-breathe 18s ease-in-out infinite reverse;
 }
