@@ -5,8 +5,8 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const level = searchParams.get('level') // e.g., '1' for A0, '10' for C2
-    const lang = searchParams.get('lang') || 'zh' // Default to Chinese
+    const level = searchParams.get('level')
+    const lang = searchParams.get('lang') || 'zh'
 
     if (!level) {
       return NextResponse.json({ error: 'Level parameter is required' }, { status: 400 })
@@ -17,23 +17,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid level parameter' }, { status: 400 })
     }
 
-    // Fetch phrases and their romanization
     const content = await prisma.vocabulary.findMany({
       where: {
         difficulty: difficulty,
         language: { code: lang },
         word: {
-          contains: ' ' // Heuristic for sentences/phrases
+          contains: ' '
         }
       },
       take: 30,
       select: {
         word: true,
-        romanization: true, // Include Pinyin
+        romanization: true,
+        translation: true,
       }
     })
 
-    // Fallback if no sentences are found
     if (content.length < 5) {
       const fallbackContent = await prisma.vocabulary.findMany({
         where: {
@@ -44,6 +43,7 @@ export async function GET(request: Request) {
         select: {
           word: true,
           romanization: true,
+          translation: true,
         }
       })
       return NextResponse.json({ phrases: fallbackContent })

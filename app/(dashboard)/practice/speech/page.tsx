@@ -5,13 +5,12 @@ import { useState, useEffect, useRef } from 'react'
 import { Mic2, ArrowLeft, Activity, Sparkles, CheckCircle2, AlertCircle, RefreshCw, Volume2, Square, ChevronDown } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Button, Card, CardBody, Spinner } from '@heroui/react'
+import { Button, Card, CardBody, Progress, Spinner } from '@heroui/react'
 
-// 1. Defined the strict Phrase interface
 interface Phrase {
   word: string
+  romanization: string
   translation: string
-  pinyin: string
 }
 
 const stages = [
@@ -27,92 +26,59 @@ export default function SpeechLabPage() {
   const [isRecording, setIsRecording] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [score, setScore] = useState<number | null>(null)
+  const [targetPhrase, setTargetPhrase] = useState<Phrase>({ word: '', romanization: '', translation: '' })
   const [status, setStatus] = useState<'idle' | 'listening' | 'analyzing' | 'success' | 'fail' | 'error' | 'loading'>('loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
 
-  // 2. State is now powered entirely by the Phrase object
-  const [targetPhrase, setTargetPhrase] = useState<Phrase>({ word: '', translation: '', pinyin: '' })
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('')
+
   const [currentLevel, setCurrentLevel] = useState(1)
   const [phrasePool, setPhrasePool] = useState<Phrase[]>([])
+  const [showDetails, setShowDetails] = useState(false)
 
   const recognitionRef = useRef<any>(null)
-  const finalTranscriptRef = useRef('')
-
-  // --- AUDIO & MIC ENGINES ---
+  const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition()
-      recognition.continuous = true
-      recognition.interimResults = true
-      recognition.lang = 'zh-CN'
-
-      recognition.onstart = () => {
-        setStatus('listening')
-        setIsRecording(true)
-        finalTranscriptRef.current = ''
-      }
-
+      recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'zh-CN'
+      recognition.onstart = () => { setStatus('listening'); setIsRecording(true) }
       recognition.onresult = (event: any) => {
-        let interimTranscript = ''
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscriptRef.current += event.results[i][0].transcript
-          } else {
-            interimTranscript += event.results[i][0].transcript
-          }
-        }
-        setTranscript(interimTranscript || finalTranscriptRef.current)
+        let currentTranscript = ''; for (let i = 0; i < event.results.length; i++) { currentTranscript += event.results[i][0].transcript }
+        setTranscript(currentTranscript)
       }
-
-      recognition.onerror = (event: any) => {
-        setErrorMessage(`Signal Error: ${event.error}`); setStatus('error'); setIsRecording(false)
-      }
-
-      recognition.onend = () => {
-        setIsRecording(false)
-        if (finalTranscriptRef.current) {
-          analyzePronunciation(finalTranscriptRef.current)
-        } else {
-          setStatus('idle')
-        }
-      }
+      recognition.onerror = (event: any) => { setErrorMessage(`Signal Error: ${event.error}`); setStatus('error'); setIsRecording(false) }
+      recognition.onend = () => setIsRecording(false)
       recognitionRef.current = recognition
     }
-  }, [targetPhrase.word])
+  }, [])
 
   const fetchPhrases = async () => {
     setStatus('loading')
     setErrorMessage('')
     try {
       const res = await fetch(`/api/practice/phrases?level=${currentLevel}&lang=zh`)
-      if (!res.ok) throw new Error('Failed to fetch phrases.')
+      if (!res.ok) throw new Error('Failed to sync phrase matrix.')
       const data = await res.json()
       if (data.phrases && data.phrases.length > 0) {
         setPhrasePool(data.phrases)
         setTargetPhrase(data.phrases[0])
         setStatus('idle')
       } else {
-        throw new Error('No phrases found.')
+        throw new Error('No phrases found for this level.')
       }
     } catch (err: any) {
-      console.warn("API failed, loading fallback phrases.", err)
-      const fallbackPhrases: Phrase[] = [
-        { word: "你好吗？", translation: "How are you?", pinyin: "Nǐ hǎo ma?" },
-        { word: "很高兴认识你。", translation: "Nice to meet you.", pinyin: "Hěn gāoxìng rènshí nǐ." },
-        { word: "我们去吃饭吧。", translation: "Let's go eat.", pinyin: "Wǒmen qù chīfàn ba." }
-      ]
-      setPhrasePool(fallbackPhrases)
-      setTargetPhrase(fallbackPhrases[0])
-      setStatus('idle')
+      setErrorMessage(err.message || 'Could not load matrix.')
+      setStatus('error')
     }
   }
 
   useEffect(() => { fetchPhrases() }, [currentLevel])
 
-  // Fixed: Listen button now clears queue and hunts for a Chinese voice
   const playTargetAudio = () => {
     if (typeof window === 'undefined' || !targetPhrase.word) return
     window.speechSynthesis.cancel()
@@ -128,43 +94,48 @@ export default function SpeechLabPage() {
     window.speechSynthesis.speak(utterance)
   }
 
-  const startRecording = () => {
-    setTranscript(''); setScore(null); setErrorMessage('')
-    if (recognitionRef.current) recognitionRef.current.start()
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      setTranscript(''); setScore(null); setErrorMessage('')
+      recognitionRef.current?.start()
+    } catch (err) {
+      setErrorMessage('Mic access denied.'); setStatus('error')
+    }
   }
 
   const stopRecording = () => {
     if (recognitionRef.current) recognitionRef.current.stop()
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    setIsRecording(false)
+    if (transcript) analyzePronunciation(transcript)
+    else setStatus('idle')
   }
 
   const analyzePronunciation = (input: string) => {
     setStatus('analyzing')
     setTimeout(() => {
-      const target = targetPhrase.word.replace(/[，。？！.,!?]/g, '')
-      const normalizedInput = input.replace(/[，。？！.,!?]/g, '')
+      const target = targetPhrase.word.replace(/[，。？！]/g, '')
+      const normalizedInput = input.replace(/[，。？！]/g, '')
       let matches = 0
       target.split('').forEach(char => { if (normalizedInput.includes(char)) matches++ })
       const finalScore = Math.min(100, Math.round((matches / target.length) * 100))
-      setScore(finalScore)
-      setStatus(finalScore >= 70 ? 'success' : 'fail')
+      setScore(finalScore); setStatus(finalScore >= 70 ? 'success' : 'fail')
+      setShowDetails(true)
     }, 1200)
   }
 
-  // Fixed: Now correctly checks against the targetPhrase.word
   const generateNewPhrase = () => {
-    if (phrasePool.length <= 1) {
-      fetchPhrases()
-      return
-    }
+    if (phrasePool.length <= 1) { fetchPhrases(); return }
     let newPhrase = targetPhrase
     while (newPhrase.word === targetPhrase.word) {
       newPhrase = phrasePool[Math.floor(Math.random() * phrasePool.length)]
     }
     setTargetPhrase(newPhrase)
     setScore(null); setTranscript(''); setStatus('idle'); setErrorMessage('')
+    setShowDetails(false)
   }
-
-  // --- UI RENDER ---
 
   return (
     <div className="relative min-h-[calc(100vh-120px)] w-full overflow-hidden rounded-[32px] bg-slate-50 dark:bg-[#030712] p-4 sm:p-8 2xl:p-12 text-slate-900 dark:text-white">
@@ -188,22 +159,20 @@ export default function SpeechLabPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-2 bg-white/40 dark:bg-white/5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-md shadow-lg">
           <div className="relative group">
-            <select value={currentLevel} onChange={(e) => setCurrentLevel(Number(e.target.value))} disabled={status === 'listening' || status === 'analyzing'} className="w-full bg-white dark:bg-[#050b14] border-2 border-transparent hover:border-sky-500/30 disabled:opacity-50 rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-widest outline-none appearance-none cursor-pointer transition-all">
+            <select value={currentLevel} onChange={(e) => setCurrentLevel(Number(e.target.value))} className="w-full bg-white dark:bg-[#050b14] border-2 border-transparent hover:border-sky-500/30 rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-widest outline-none appearance-none cursor-pointer transition-all">
               {stages.map(s => <option key={s.num} value={s.num}>{`${s.level} - ${s.title}`}</option>)}
             </select>
             <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
           </div>
           <div className="flex items-center gap-2 p-1 bg-white dark:bg-[#050b14] rounded-xl border-2 border-transparent">
             {[0.5, 1.0, 1.5, 2.0].map((s) => (
-              <button key={s} onClick={() => setPlaybackSpeed(s)} disabled={status === 'listening' || status === 'analyzing'} className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black transition-all disabled:opacity-50 ${playbackSpeed === s ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-500 hover:bg-sky-500/10'}`}>{s}x</button>
+              <button key={s} onClick={() => setPlaybackSpeed(s)} className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black transition-all ${playbackSpeed === s ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-500 hover:bg-sky-500/10'}`}>{s}x</button>
             ))}
           </div>
         </div>
 
         <main className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-          {/* Left Panel: Display */}
-          <Card className="lg:col-span-7 bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-transparent rounded-[40px] shadow-2xl dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)] overflow-hidden min-h-[450px]">
+          <Card className="lg:col-span-7 bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 rounded-[40px] shadow-2xl overflow-hidden min-h-[450px]">
             <CardBody className="p-10 flex flex-col items-center justify-center text-center space-y-10">
               {status === 'loading' && <Spinner label="Syncing New Matrix..." color="primary" />}
               {status === 'error' && (
@@ -214,112 +183,100 @@ export default function SpeechLabPage() {
                 </div>
               )}
               {status !== 'loading' && status !== 'error' && (
-                <AnimatePresence mode="wait">
-                  <motion.div key={targetPhrase.word} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full space-y-10">
+                <>
+                  <div className="space-y-6">
+                    <span className="text-[10px] font-black text-sky-500 uppercase tracking-[0.4em]">Target Matrix</span>
 
-                    {/* The Word, Translation, and Pinyin */}
                     <div className="space-y-4">
-                      <span className="text-[10px] font-black text-sky-500 uppercase tracking-[0.4em]">Target Matrix</span>
-                      <div className="text-5xl sm:text-7xl font-black tracking-tighter leading-tight text-slate-900 dark:text-white">{targetPhrase.word}</div>
+                      <div className="text-5xl sm:text-7xl font-black tracking-tighter leading-tight">{targetPhrase.word}</div>
 
-                      <div className="flex flex-col items-center gap-1 mt-2">
-                        <div className="text-lg sm:text-xl font-medium text-slate-500 dark:text-slate-400 italic tracking-wide">
-                          "{targetPhrase.translation}"
+                      <div className="space-y-1 relative">
+                        <div className={`space-y-1 transition-all duration-300 ${showDetails ? 'blur-0' : 'blur-md select-none pointer-events-none'}`}>
+                          <div className="text-lg sm:text-xl font-medium text-slate-500 dark:text-slate-400 italic tracking-wide">
+                            "{targetPhrase.translation}"
+                          </div>
+                          {targetPhrase.romanization && (
+                            <div className="text-base sm:text-lg font-mono font-bold text-sky-500/80 dark:text-sky-400/80 tracking-widest">
+                              {targetPhrase.romanization}
+                            </div>
+                          )}
                         </div>
-                        {targetPhrase.pinyin && (
-                          <div className="text-base sm:text-lg font-mono font-bold text-sky-500/80 dark:text-sky-400/80 tracking-widest">
-                            {targetPhrase.pinyin}
+                        {!showDetails && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <button onClick={() => setShowDetails(true)} className="px-6 py-2 rounded-full bg-sky-500/10 text-sky-500 border border-sky-500/20 font-bold text-xs uppercase tracking-widest hover:bg-sky-500/20 transition-all">
+                              Reveal
+                            </button>
                           </div>
                         )}
                       </div>
-
-                      <button onClick={playTargetAudio} disabled={status === 'listening' || status === 'analyzing'} className="mx-auto flex items-center gap-3 px-8 py-3 mt-6 rounded-full bg-sky-500 text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-sky-500/20 hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 transition-all">
-                        <Volume2 size={18} /> Listen to Signal
-                      </button>
                     </div>
 
-                    <div className="w-full h-[1px] bg-slate-200 dark:bg-slate-800" />
+                    <button onClick={playTargetAudio} className="mx-auto flex items-center gap-3 px-8 py-3 rounded-full bg-sky-500 text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-sky-500/20 hover:-translate-y-0.5 transition-all">
+                      <Volume2 size={18} /> Listen to Signal
+                    </button>
+                  </div>
 
-                    <div className="space-y-4 w-full">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Your Signal</span>
-                      <div className={`text-2xl font-bold min-h-[40px] ${status === 'listening' ? 'text-sky-500' : 'text-slate-600 dark:text-slate-300'}`}>
-                        {transcript || (status === 'listening' ? 'Capturing Waves...' : 'Awaiting Input...')}
-                      </div>
+                  <div className="w-full h-[1px] bg-slate-200 dark:bg-slate-800" />
+
+                  <div className="space-y-4 w-full">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Your Signal</span>
+                    <div className={`text-2xl font-bold min-h-[40px] ${status === 'listening' ? 'text-sky-500 animate-pulse' : 'text-slate-600 dark:text-slate-300'}`}>
+                      {transcript || (status === 'listening' ? 'Capturing Waves...' : status === 'analyzing' ? 'Verifying Patterns...' : 'Awaiting Input...')}
                     </div>
-                  </motion.div>
-                </AnimatePresence>
+                  </div>
+                </>
               )}
             </CardBody>
           </Card>
 
-          {/* Right Panel: Restored the complete dynamic states */}
-          <div className="lg:col-span-5 space-y-8 flex flex-col">
-            {status !== 'loading' && status !== 'error' && (
-              <Card className="flex-1 transition-all duration-500 bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-transparent rounded-[40px] p-8 shadow-xl dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)] min-h-[450px] flex items-center justify-center">
-                <CardBody className="flex flex-col items-center justify-center gap-8 w-full">
+          <div className="lg:col-span-5 space-y-8">
+            <Card className="transition-all duration-500 bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 rounded-[40px] p-8 shadow-xl">
+              <CardBody className="flex flex-col items-center gap-8">
+                <button onClick={isRecording ? stopRecording : startRecording} disabled={status === 'loading' || status === 'analyzing'} className="relative w-36 h-36 rounded-full flex items-center justify-center transition-all duration-500 bg-sky-500 shadow-[0_0_40px_rgba(56,189,248,0.3)] hover:scale-105 active:scale-95">
+                  {status === 'analyzing' ? <Spinner size="lg" color="white" /> : isRecording ? <Square className="text-white fill-white" size={32} /> : <Mic2 size={56} className="text-white" />}
+                  {isRecording && <span className="absolute inset-[-15px] rounded-full border-2 border-rose-500 animate-ping opacity-20" />}
+                </button>
+                <div className="text-center space-y-3">
+                  <span className="text-sm font-black uppercase tracking-[0.2em]">{status === 'listening' ? 'Stop Recording' : 'Push to Speak'}</span>
+                  {errorMessage && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest text-center">{errorMessage}</p>}
+                </div>
+              </CardBody>
+            </Card>
+            <Button onClick={generateNewPhrase} disabled={status === 'loading' || status === 'analyzing'} className="w-full h-16 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-slate-800 font-black uppercase tracking-widest text-xs hover:bg-sky-500 hover:text-white transition-all shadow-md group">
+              <RefreshCw size={16} className="mr-2 group-hover:rotate-180 transition-transform duration-700" /> New Neural Pattern
+            </Button>
 
-                  {status === 'analyzing' && (
-                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-6">
-                      <Spinner size="lg" color="primary" />
-                      <span className="text-xs font-black uppercase tracking-[0.3em] text-sky-500 animate-pulse text-center">Analyzing Signal Matrix...</span>
-                    </motion.div>
-                  )}
-
-                  {(status === 'success' || status === 'fail') && score !== null && (
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-8 w-full">
-                      <div className={`relative flex items-center justify-center w-40 h-40 rounded-full border-8 shadow-2xl ${status === 'success' ? 'border-emerald-500/20 shadow-emerald-500/10' : 'border-amber-500/20 shadow-amber-500/10'}`}>
-                        <div className="flex flex-col items-center">
-                          <span className="text-5xl font-black text-slate-900 dark:text-white">{score}%</span>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Match Rate</span>
+            <AnimatePresence>{score !== null && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+                <Card className="bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-2xl">
+                  <CardBody className="space-y-6">
+                    <div className="space-y-2 text-center">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Accuracy Score</span>
+                        <div className={`flex items-center gap-2 ${score >= 70 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                          <span className="text-3xl font-black">{score}%</span>
                         </div>
                       </div>
-                      <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${status === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'}`}>
-                        {status === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                        <span className="text-[10px] font-black uppercase tracking-widest">{status === 'success' ? 'Matrix Synchronized' : 'Sub-optimal Match'}</span>
+                      <Progress value={score} color={score >= 70 ? 'success' : 'warning'} className="h-2.5" />
+                    </div>
+                    <div className="text-left space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pinyin</p>
+                        <p className="font-mono font-bold text-sky-500/80 dark:text-sky-400/80 tracking-widest text-lg">
+                          {targetPhrase.romanization}
+                        </p>
                       </div>
-                      <div className="w-full space-y-3 mt-4">
-                        <Button onClick={generateNewPhrase} className="w-full h-14 bg-sky-500 text-white font-black uppercase tracking-[0.2em] text-xs rounded-2xl shadow-lg shadow-sky-500/20 hover:-translate-y-1 transition-all">
-                          Next Sequence <RefreshCw size={16} className="ml-2" />
-                        </Button>
-                        <Button onClick={() => { setStatus('idle'); setTranscript(''); setScore(null); }} className="w-full h-14 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-[0.2em] text-xs rounded-2xl hover:bg-slate-200 dark:hover:bg-white/10 transition-all">
-                          Retry Signal
-                        </Button>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Translation</p>
+                        <p className="font-medium text-slate-500 dark:text-slate-400 italic text-lg">
+                          "{targetPhrase.translation}"
+                        </p>
                       </div>
-                    </motion.div>
-                  )}
-
-                  {(status === 'idle' || status === 'listening') && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-10">
-                      <button onClick={isRecording ? stopRecording : startRecording} className={`relative flex items-center justify-center w-32 h-32 rounded-full transition-all duration-500 shadow-2xl ${isRecording ? 'bg-rose-500 hover:bg-rose-600 shadow-[0_0_40px_rgba(244,63,94,0.5)] animate-pulse' : 'bg-sky-500 hover:bg-sky-600 shadow-[0_0_40px_rgba(56,189,248,0.4)] hover:-translate-y-2'}`}>
-                        {isRecording ? <Square size={40} className="text-white fill-white" /> : <Mic2 size={48} className="text-white" />}
-                      </button>
-                      <div className="text-center space-y-2">
-                        <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{isRecording ? 'Recording Active' : 'Initialize Mic'}</p>
-                        {isRecording && (
-                          <div className="flex items-center justify-center gap-2">
-                            <Activity size={16} className="text-rose-500 animate-bounce" />
-                            <span className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Capturing Audio Matrix</span>
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-
-                </CardBody>
-              </Card>
-            )}
-
-            {(status === 'idle' || status === 'listening') && (
-              <Button
-                onClick={generateNewPhrase}
-                // FIXED: Removed the impossible 'analyzing' check
-                isDisabled={status === 'listening'}
-                className="w-full h-14 bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-black uppercase tracking-[0.2em] text-xs rounded-2xl hover:bg-slate-300 dark:hover:bg-white/20 transition-all"
-              >
-                Skip Pattern <ChevronDown size={16} className="ml-2 -rotate-90" />
-              </Button>
-            )}
-
+                    </div>
+                  </CardBody>
+                </Card>
+              </motion.div>
+            )}</AnimatePresence>
           </div>
         </main>
       </div>
