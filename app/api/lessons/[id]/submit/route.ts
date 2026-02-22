@@ -30,9 +30,13 @@ export async function POST(
       include: {
         chapter: {
           include: {
+            lessons: true,
             stage: {
               include: {
-                language: true
+                language: true,
+                chapters: {
+                  orderBy: { chapterNum: 'asc' }
+                }
               }
             }
           }
@@ -107,49 +111,47 @@ export async function POST(
 
 
     // 4. Update UserLanguage progress (Stage/Chapter advancement)
-    const langCode = lesson.chapter.stage.language.code // Directly use language code from the nested relation
-    
-    if (lesson.chapter.stage.language) {
-      await prisma.userLanguage.upsert({
-        where: { userId_languageCode: { userId: authUser.id, languageCode: langCode } },
-        update: {
-          xpInLanguage: { increment: xpEarned }
-        },
-        create: {
-          userId: authUser.id,
-          languageCode: langCode,
-          xpInLanguage: xpEarned,
-          // Other default values for currentStage, currentChapter etc. if it's a new entry
-        }
-      })
+    const langCode = lesson.chapter.stage.language.code
+    const userLanguage = await prisma.userLanguage.upsert({
+      where: { userId_languageCode: { userId: authUser.id, languageCode: langCode } },
+      update: {
+        xpInLanguage: { increment: xpEarned }
+      },
+      create: {
+        userId: authUser.id,
+        languageCode: langCode,
+        xpInLanguage: xpEarned,
+        currentStage: 1,
+        currentChapter: 1,
+      }
+    })
 
-      // 5. Update weekly leaderboard entry
-      const startOfWeek = new Date()
-      startOfWeek.setUTCHours(0, 0, 0, 0)
-      startOfWeek.setUTCDate(startOfWeek.getUTCDate() - (startOfWeek.getUTCDay() + 6) % 7) // Monday start of week
+    // 5. Update weekly leaderboard entry
+    const startOfWeek = new Date()
+    startOfWeek.setUTCHours(0, 0, 0, 0)
+    startOfWeek.setUTCDate(startOfWeek.getUTCDate() - (startOfWeek.getUTCDay() + 6) % 7) // Monday start of week
 
-      await prisma.leaderboardEntry.upsert({
-        where: {
-          userId_languageCode_weekStart: {
-            userId: authUser.id,
-            languageCode: langCode,
-            weekStart: startOfWeek,
-          },
-        },
-        update: {
-          xpEarned: { increment: xpEarned },
-        },
-        create: {
+    await prisma.leaderboardEntry.upsert({
+      where: {
+        userId_languageCode_weekStart: {
           userId: authUser.id,
           languageCode: langCode,
           weekStart: startOfWeek,
-          xpEarned: xpEarned,
         },
-      })
-    }
+      },
+      update: {
+        xpEarned: { increment: xpEarned },
+      },
+      create: {
+        userId: authUser.id,
+        languageCode: langCode,
+        weekStart: startOfWeek,
+        xpEarned: xpEarned,
+      },
+    })
 
     // 6. Record individual lesson progress
-    const progress = await prisma.userProgress.create({
+    await prisma.userProgress.create({
       data: {
         userId: authUser.id,
         lessonId: lesson.id,
@@ -157,6 +159,60 @@ export async function POST(
         xpEarned,
       }
     })
+
+    // 7. Check Chapter Completion & Advancement
+    if (isPassed) {
+      // Find all completed lessons for this user in this chapter
+      const completedLessonsInChapter = await prisma.userProgress.findMany({
+        where: {
+          userId: authUser.id,
+          lessonId: { in: lesson.chapter.lessons.map(l => l.id) }
+        },
+        select: { lessonId: true }
+      })
+
+      const uniqueCompletedLessonIds = new Set(completedLessonsInChapter.map(l => l.lessonId))
+      const allLessonsCompleted = uniqueCompletedLessonIds.size === lesson.chapter.lessons.length
+
+      if (allLessonsCompleted) {
+        const currentStageNum = userLanguage.currentStage
+        const currentChapterNum = userLanguage.currentChapter
+
+        // Only advance if we just finished the "current" chapter
+        if (lesson.chapter.stage.stageNumber === currentStageNum && lesson.chapter.chapterNum === currentChapterNum) {
+          const chaptersInStage = lesson.chapter.stage.chapters
+          const isLastChapterInStage = lesson.chapter.chapterNum === chaptersInStage[chaptersInStage.length - 1].chapterNum
+
+          if (isLastChapterInStage) {
+            // Check if there is a next stage
+            const nextStage = await prisma.stage.findFirst({
+              where: {
+                languageId: lesson.chapter.stage.languageId,
+                stageNumber: currentStageNum + 1
+              }
+            })
+
+            if (nextStage) {
+              await prisma.userLanguage.update({
+                where: { userId_languageCode: { userId: authUser.id, languageCode: langCode } },
+                data: {
+                  currentStage: currentStageNum + 1,
+                  currentChapter: 1
+                }
+              })
+            }
+          } else {
+            // Just move to next chapter
+            await prisma.userLanguage.update({
+              where: { userId_languageCode: { userId: authUser.id, languageCode: langCode } },
+              data: {
+                currentChapter: currentChapterNum + 1
+              }
+            })
+          }
+        }
+      }
+    }
 
 
     return NextResponse.json({

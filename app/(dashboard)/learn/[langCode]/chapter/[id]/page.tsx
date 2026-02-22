@@ -78,8 +78,9 @@ export default function ChapterLessonsPage({ params }: { params: { langCode: str
     )
   }
 
-  const activeIndex = chapter.lessons.findIndex(l => !l.completed)
-  const currentActiveIndex = activeIndex === -1 ? chapter.lessons.length : activeIndex
+  const lessons = chapter.lessons || []
+  const activeIndex = lessons.findIndex(l => !l.completed)
+  const currentActiveIndex = activeIndex === -1 ? lessons.length : activeIndex
 
   return (
     <div className="w-full max-w-screen-2xl mx-auto space-y-12 pb-32 relative z-10 px-4 sm:px-6 2xl:px-10">
@@ -112,11 +113,11 @@ export default function ChapterLessonsPage({ params }: { params: { langCode: str
             <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800/50 rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: `${(currentActiveIndex / chapter.lessons.length) * 100}%` }}
+                animate={{ width: `${(currentActiveIndex / (lessons.length || 1)) * 100}%` }}
                 className="h-full bg-sky-500 shadow-[0_0_10px_rgba(56,189,248,0.5)]"
               />
             </div>
-            <span className="text-xs font-black text-slate-900 dark:text-white">{Math.round((currentActiveIndex / chapter.lessons.length) * 100)}%</span>
+            <span className="text-xs font-black text-slate-900 dark:text-white">{Math.round((currentActiveIndex / (lessons.length || 1)) * 100)}%</span>
           </div>
         </div>
       </header>
@@ -135,7 +136,7 @@ export default function ChapterLessonsPage({ params }: { params: { langCode: str
         </div>
 
         <div className="space-y-8 relative z-10">
-          {chapter.lessons.map((lesson, index) => {
+          {lessons.map((lesson, index) => {
             const isCompleted = index < currentActiveIndex
             const isActive = index === currentActiveIndex
             const isLocked = index > currentActiveIndex

@@ -88,6 +88,12 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
   const { id: lessonId } = params
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
+  const [ttsMode, setTtsMode] = useState<'ai' | 'local'>('local')
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('')
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isThinking, setIsThinking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,17 +113,78 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
 
   const router = useRouter()
   const { isOpen, onOpen, onOpenChange } = useDisclosure()
+  const { isOpen: isSettingsOpen, onOpen: onSettingsOpen, onOpenChange: onSettingsOpenChange } = useDisclosure()
   const audioCache = useRef<Map<string, string>>(new Map())
 
-  const playTTS = async (text: string) => {
-    if (!text) return
-    setIsThinking(true) // Show AI Thinking state
+  // LOAD VOICES
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices()
+      setAvailableVoices(voices)
+      
+      if (!selectedVoiceURI && voices.length > 0) {
+        const saved = localStorage.getItem('neural_voice_uri')
+        if (saved && voices.find(v => v.voiceURI === saved)) {
+          setSelectedVoiceURI(saved)
+        } else {
+          const defaultVoice = voices.find(v => v.name.includes('Premium') || v.name.includes('Enhanced')) || voices[0]
+          setSelectedVoiceURI(defaultVoice.voiceURI)
+        }
+      }
+    }
 
-    if (audioCache.current.has(text)) {
-      setTimeout(() => {
-        new Audio(audioCache.current.get(text)).play()
+    loadVoices()
+    window.speechSynthesis.onvoiceschanged = loadVoices
+    
+    const savedMode = localStorage.getItem('tts_mode') as 'ai' | 'local'
+    if (savedMode) setTtsMode(savedMode)
+  }, [selectedVoiceURI])
+
+  const speakLocal = (text: string, speed: number) => {
+    return new Promise<void>((resolve) => {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(text)
+      const voice = availableVoices.find(v => v.voiceURI === selectedVoiceURI)
+      if (voice) utterance.voice = voice
+      
+      if (lesson?.chapter.stage.language.code) {
+        const code = lesson.chapter.stage.language.code
+        utterance.lang = code === 'zh' ? 'zh-CN' : code === 'en' ? 'en-US' : code
+      }
+
+      utterance.rate = speed
+      utterance.pitch = 1
+      utterance.onend = () => resolve()
+      utterance.onerror = () => resolve()
+      window.speechSynthesis.speak(utterance)
+    })
+  }
+
+  const playTTS = async (text: string, forceSpeed?: number) => {
+    if (!text) return
+    const speed = forceSpeed || playbackSpeed
+
+    if (ttsMode === 'local') {
+      await speakLocal(text, speed)
+      return
+    }
+
+    setIsThinking(true)
+    const cacheKey = `${text}_${speed.toFixed(2)}`
+
+    if (audioCache.current.has(cacheKey)) {
+      try {
+        const audio = new Audio(audioCache.current.get(cacheKey)!)
+        await new Promise((resolve, reject) => {
+          audio.onended = resolve
+          audio.onerror = reject
+          audio.play().catch(reject)
+        })
+      } catch (err) {
+        console.warn('Audio playback failed:', err)
+      } finally {
         setIsThinking(false)
-      }, 400) // Artificial delay for "AI feeling"
+      }
       return
     }
 
@@ -125,15 +192,22 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
       const res = await fetch('/api/ai/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice: 'nova' }),
+        body: JSON.stringify({ text, voice: 'nova', speed: speed }),
       })
       const data = await res.json()
       if (res.ok && data.audioUrl) {
-        audioCache.current.set(text, data.audioUrl)
-        new Audio(data.audioUrl).play()
+        audioCache.current.set(cacheKey, data.audioUrl)
+        const audio = new Audio(data.audioUrl)
+        await new Promise((resolve, reject) => {
+          audio.onended = resolve
+          audio.onerror = reject
+          audio.play().catch(reject)
+        })
       }
+    } catch (err) {
+      console.error('TTS error:', err)
     } finally {
-      setTimeout(() => setIsThinking(false), 600)
+      setIsThinking(false)
     }
   }
 
@@ -150,7 +224,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
       } catch (err) {
         setError('Uplink failed.')
       } finally {
-        setTimeout(() => setLoading(false), 800) // Smooth transition
+        setTimeout(() => setLoading(false), 800)
       }
     }
     fetchLesson()
@@ -160,11 +234,6 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
 
   const handleAnswer = (answer: string) => {
     setSelectedAnswer(answer)
-    // 🛡️ TOKEN SAVER: Only speak if it contains target language characters (Chinese, Khmer, etc.)
-    const isTargetLanguage = /[^\x00-\x7F]/.test(answer)
-    if (isTargetLanguage) {
-      playTTS(answer)
-    }
   }
 
   const handleCheck = async () => {
@@ -219,7 +288,6 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
   }
 
   const handleRefillHearts = async () => {
-    // Simplified refill for demo
     setHearts(5)
     setCombo(0)
     onOpenChange()
@@ -236,32 +304,30 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
     </div>
   )
 
-  // Find next lesson in chapter
   const currentLessonIdx = (lesson.chapter.lessons || []).findIndex(l => l.id === lessonId)
   const nextLessonId = lesson.chapter.lessons?.[currentLessonIdx + 1]?.id
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-slate-50 dark:bg-[#030712] overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#030712]">
 
-      {/* 1. ANIMATED HEADER (Running Gradient) */}
-      <div className="flex-none relative z-30 w-full max-w-5xl mx-auto px-4 py-4 sm:px-8 mt-4">
-        <div className="relative rounded-[24px] p-[1px] overflow-hidden">
-          {/* THE RUNNING GRADIENT BORDER */}
+      {/* 1. STICKY HEADER */}
+      <div className="sticky top-0 z-50 w-full px-4 pt-4 sm:pt-6">
+        <div className="max-w-5xl mx-auto relative rounded-[24px] p-[1px] overflow-hidden shadow-2xl">
           <div className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#00000000_50%,#38bdf8_100%)] opacity-40 dark:opacity-60" />
 
-          <div className="relative flex items-center gap-6 px-6 py-4 bg-white/80 dark:bg-[#050b14]/80 backdrop-blur-2xl rounded-[23px] border border-white/20 dark:border-slate-800/50 shadow-2xl">
-            <Link href={`/learn/${lesson.chapter.stage.language.code}/chapter/${lesson.chapter.id}`} className="group flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-sky-500/10 transition-all">
+          <div className="relative flex items-center gap-4 sm:gap-6 px-4 sm:px-6 py-4 bg-white/80 dark:bg-[#050b14]/80 backdrop-blur-2xl rounded-[23px] border border-white/20 dark:border-slate-800/50">
+            <Link href={`/learn/${lesson.chapter.stage.language.code}/chapter/${lesson.chapter.id}`} className="group flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-sky-500/10 transition-all shrink-0">
               <X size={18} className="text-slate-500 group-hover:text-sky-500" />
             </Link>
 
             <div className="flex-1 space-y-2">
               <div className="flex justify-between items-end">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Syncing Module 0{currentIndex + 1}</span>
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Syncing Module 0{currentIndex + 1}</span>
                 <AnimatePresence>
                   {isThinking && (
                     <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
                       <Cpu size={12} className="text-sky-500 animate-spin" />
-                      <span className="text-[9px] font-bold text-sky-500 uppercase tracking-widest">AI Decoding Sound...</span>
+                      <span className="text-[9px] font-bold text-sky-500 uppercase tracking-widest hidden sm:inline">Decoding...</span>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -269,20 +335,43 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
               <Progress value={((currentIndex + (status !== 'playing' ? 1 : 0)) / totalQuestions) * 100} size="sm" color="primary" />
             </div>
 
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-slate-800 shadow-inner">
+            {/* SPEED CONTROLS */}
+            <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-slate-800 shadow-inner overflow-hidden">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Speed:</span>
+              <div className="flex gap-1">
+                {[0.5, 0.8, 1, 1.5].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setPlaybackSpeed(s)}
+                    className={`text-[10px] font-black px-2 py-1 rounded-md transition-all ${playbackSpeed === s ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-500 hover:bg-sky-500/10'}`}
+                  >
+                    {s}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-slate-800 shadow-inner shrink-0">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Heart key={i} size={16} className={i < hearts ? 'text-rose-500 fill-rose-500' : 'text-slate-300 dark:text-slate-700'} />
+                <Heart key={i} size={14} className={i < hearts ? 'text-rose-500 fill-rose-500' : 'text-slate-300 dark:text-slate-700'} />
               ))}
             </div>
+
+            <button 
+              onClick={onSettingsOpen}
+              className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-slate-800 hover:border-sky-500/50 transition-all text-slate-500 hover:text-sky-500 shrink-0"
+            >
+              <Cpu size={18} />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* 2. MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative z-10 w-full flex flex-col items-center justify-center p-4 sm:p-8">
+      {/* 2. FLEXIBLE CONTENT AREA */}
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-12 sm:py-20 flex flex-col items-center justify-center">
         <AnimatePresence mode="wait">
           {status === 'completed' ? (
-            <motion.div key="completed" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-8 bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 p-12 rounded-[40px] shadow-2xl max-w-lg w-full">
+            <motion.div key="completed" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-8 bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 p-8 sm:p-12 rounded-[40px] shadow-2xl max-w-lg w-full">
               <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
                 <CheckCircle2 size={48} className="text-emerald-500" />
               </div>
@@ -305,10 +394,16 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
               )}
             </motion.div>
           ) : currentQuestion ? (
-            <motion.div key={currentIndex} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="w-full max-w-2xl">
-              {currentQuestion.type === 'flashcard' && <FlashCard question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
+            <motion.div 
+              key={currentIndex} 
+              initial={{ opacity: 0, x: 20 }} 
+              animate={{ opacity: 1, x: 0 }} 
+              exit={{ opacity: 0, x: -20 }} 
+              className={`w-full ${['writing', 'reading', 'dialogue', 'listening'].includes(currentQuestion.type) ? 'max-w-4xl' : 'max-w-2xl'}`}
+            >
+              {currentQuestion.type === 'flashcard' && <FlashCard question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} playbackSpeed={playbackSpeed} playTTS={playTTS} />}
               {currentQuestion.type === 'multiple-choice' && <MultipleChoice question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
-              {currentQuestion.type === 'listening' && <Listening question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} showOptions={true} />}
+              {currentQuestion.type === 'listening' && <Listening question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} showOptions={true} playbackSpeed={playbackSpeed} playTTS={playTTS} />}
               {currentQuestion.type === 'speaking' && <Speaking question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'writing' && <Writing question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'fill-in-the-blank' && <FillInBlank question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
@@ -319,10 +414,10 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
         </AnimatePresence>
       </main>
 
-      {/* 3. PINNED FOOTER */}
-      <footer className={`flex-none relative z-20 border-t backdrop-blur-3xl py-8 px-6 sm:px-10 transition-colors duration-500 ${status === 'correct' ? 'bg-emerald-500/10 border-emerald-500/30' :
+      {/* 3. STICKY FOOTER */}
+      <footer className={`sticky bottom-0 z-40 border-t backdrop-blur-3xl py-6 sm:py-8 px-6 transition-colors duration-500 ${status === 'correct' ? 'bg-emerald-500/10 border-emerald-500/30' :
         status === 'wrong' ? 'bg-rose-500/10 border-rose-500/30' :
-          'bg-white/50 dark:bg-white/[0.02] border-slate-200/80 dark:border-slate-800/80'
+          'bg-white/80 dark:bg-[#030712]/80 border-slate-200/80 dark:border-slate-800/80'
         }`}>
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex-1">
@@ -350,7 +445,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
           <button
             onClick={status === 'playing' ? handleCheck : handleNext}
             disabled={isSubmitting || (status === 'playing' && !selectedAnswer && !['speaking', 'writing', 'dialogue'].includes(currentQuestion?.type || ''))}
-            className={`min-w-[240px] px-10 h-16 rounded-2xl font-black text-xl uppercase tracking-[0.2em] transition-all duration-300 ${status === 'correct' ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' :
+            className={`w-full sm:min-w-[240px] sm:w-auto px-10 h-16 rounded-2xl font-black text-xl uppercase tracking-[0.2em] transition-all duration-300 ${status === 'correct' ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' :
               status === 'wrong' ? 'bg-rose-500 text-white shadow-[0_0_20px_rgba(244,63,94,0.4)]' :
                 'bg-sky-500 text-white shadow-lg hover:-translate-y-1'
               } disabled:opacity-50 disabled:grayscale`}
@@ -359,6 +454,75 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
           </button>
         </div>
       </footer>
+
+      {/* SETTINGS MODAL */}
+      <Modal 
+        isOpen={isSettingsOpen} 
+        onOpenChange={onSettingsOpenChange} 
+        className="dark:bg-[#050b14] border border-slate-800 max-w-md"
+        backdrop="blur"
+      >
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1 text-slate-900 dark:text-white uppercase tracking-tighter pt-10">
+            <div className="flex items-center gap-2">
+              <Sparkles className="text-sky-500" size={18} />
+              <span>Transmission Settings</span>
+            </div>
+          </ModalHeader>
+          <ModalBody className="pb-10">
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Processing Core</span>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-slate-800">
+                  <button 
+                    onClick={() => { setTtsMode('ai'); localStorage.setItem('tts_mode', 'ai'); }}
+                    className={`py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${ttsMode === 'ai' ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Cloud AI
+                  </button>
+                  <button 
+                    onClick={() => { setTtsMode('local'); localStorage.setItem('tts_mode', 'local'); }}
+                    className={`py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${ttsMode === 'local' ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Local Link
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 italic">
+                  {ttsMode === 'ai' ? 'High-fidelity neural synthesis (Uses data).' : 'Zero-latency edge processing (Free & Instant).'}
+                </p>
+              </div>
+
+              {ttsMode === 'local' && (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Neural Voice Signature</span>
+                  <select 
+                    value={selectedVoiceURI}
+                    onChange={(e) => { setSelectedVoiceURI(e.target.value); localStorage.setItem('neural_voice_uri', e.target.value); }}
+                    className="w-full bg-white dark:bg-[#030712] border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-sky-500/50 outline-none transition-all"
+                  >
+                    {availableVoices
+                      .filter(v => !lesson?.chapter.stage.language.code || v.lang.startsWith(lesson.chapter.stage.language.code))
+                      .map(voice => (
+                        <option key={voice.voiceURI} value={voice.voiceURI}>
+                          {voice.name} ({voice.lang})
+                        </option>
+                      ))
+                    }
+                    {availableVoices.length === 0 && <option>No local voices detected</option>}
+                  </select>
+                  
+                  <button 
+                    onClick={() => speakLocal("Transmission check. Neural link stable.", 1.0)}
+                    className="w-full py-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-slate-800 text-sky-500 font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-sky-500/10 transition-all"
+                  >
+                    <Activity size={14} /> Pulse Test
+                  </button>
+                </div>
+              )}
+            </div>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
       <Modal isOpen={isOpen} onOpenChange={onOpenChange} isDismissable={false} hideCloseButton className="dark:bg-[#050b14] border border-slate-800">
         <ModalContent>

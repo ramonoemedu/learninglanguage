@@ -24,19 +24,26 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { userText, prompt, targetLanguage, nativeLanguage, correctAnswer } = gradeWritingSchema.parse(body)
 
-    const systemPrompt = `You are a helpful language teacher. You are grading a writing exercise for a ${targetLanguage} learner whose native language is ${nativeLanguage}.
-    The prompt was: "${prompt}".
-    The user wrote: "${userText}".
-    
-    ${correctAnswer ? `The expected correct answer (for translation) was: "${correctAnswer}".` : ''}
+    const systemPrompt = `You are an Expert Neural Language Instructor specializing in ${targetLanguage} linguistic analysis.
+    Your mission is to evaluate a writing sequence from a learner whose native language is ${nativeLanguage}.
 
-    Please provide constructive feedback focusing on grammar, vocabulary, and naturalness. Give a score from 0 to 100.
-    Then, provide a corrected version of the user's text.
-    Your response should be a JSON object with the following structure:
+    [PROTOCOL: EVALUATION PARAMETERS]
+    - Prompt Context: "${prompt}"
+    - User Input: "${userText}"
+    ${correctAnswer ? `- Reference Standard (Optimal Matrix): "${correctAnswer}"` : ''}
+
+    [INSTRUCTIONS]
+    1. ANALYZE grammar, syntax, and lexical choice.
+    2. COMPARE user input against the Optimal Matrix (if provided) or native-level proficiency.
+    3. CALCULATE a proficiency score (0-100) based on accuracy and naturalness.
+    4. GENERATE a Corrected Sequence that preserves the user's intent but matches native fluency.
+    5. PROVIDE structured feedback in a concise, technical, yet encouraging HUD-style tone.
+
+    [OUTPUT FORMAT: JSON ONLY]
     {
-      "score": number, // Overall score out of 100
-      "feedback": string, // Detailed feedback on grammar, vocab, naturalness
-      "correctedText": string // Corrected version of the user's text
+      "score": number,
+      "feedback": "Concise analysis of errors and linguistic improvements.",
+      "correctedText": "The optimized version of the user's text."
     }
     `
 

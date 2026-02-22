@@ -1,10 +1,10 @@
 // components/lesson/Listening.tsx
 'use client'
 
-import { Button, Card, CardBody, Input, Spinner } from '@heroui/react'
-import { Volume2, Sparkles, Activity, Headphones, CheckCircle2 } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Card, CardBody, Input, Spinner } from '@heroui/react'
+import { Volume2, Headphones } from 'lucide-react'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
 
 interface ListeningProps {
   question: {
@@ -12,70 +12,29 @@ interface ListeningProps {
     audioUrl?: string
     options?: string[]
     correctAnswer: string
-    word?: string // The target language word
+    word?: string 
     languageCode?: string
   }
   onAnswer: (answer: string) => void
   selectedAnswer: string
   disabled?: boolean
   showOptions?: boolean
+  playbackSpeed?: number
+  playTTS: (text: string, forceSpeed?: number) => Promise<void>
 }
 
-export default function Listening({ question, onAnswer, selectedAnswer, disabled, showOptions = true }: ListeningProps) {
-  const [isAudioLoading, setIsAudioLoading] = useState(false)
+export default function Listening({ question, onAnswer, selectedAnswer, disabled, showOptions = true, playbackSpeed = 1.0, playTTS }: ListeningProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [inputValue, setInputValue] = useState(selectedAnswer)
-  const audioCache = useRef<Map<string, string>>(new Map())
 
-  const playAudio = async () => {
-    if (isAudioLoading) return
-    
-    // Determine what to speak: word (target lang) is prioritized over correctAnswer (meaning)
+  const handlePlay = async () => {
     const textToSpeak = question.word || question.correctAnswer
     if (!textToSpeak) return
 
-    // 🛡️ TOKEN SAVER: Audio Cache
-    if (audioCache.current.has(textToSpeak)) {
-      const audio = new Audio(audioCache.current.get(textToSpeak))
-      audio.onplay = () => setIsPlaying(true)
-      audio.onended = () => setIsPlaying(false)
-      audio.play()
-      return
-    }
-
-    setIsAudioLoading(true)
-    try {
-      const res = await fetch('/api/ai/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          text: textToSpeak, 
-          voice: 'nova', 
-          speed: 1.0,
-        }),
-      })
-      const data = await res.json()
-      if (res.ok && data.audioUrl) {
-        audioCache.current.set(textToSpeak, data.audioUrl)
-        const audio = new Audio(data.audioUrl)
-        audio.onplay = () => setIsPlaying(true)
-        audio.onended = () => setIsPlaying(false)
-        audio.play()
-      }
-    } catch (error) {
-      console.error('Error playing audio:', error)
-    } finally {
-      setIsAudioLoading(false)
-    }
+    setIsPlaying(true)
+    await playTTS(textToSpeak)
+    setIsPlaying(false)
   }
-
-  // 🔊 AUTO-PLAY ON MOUNT
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      playAudio()
-    }, 600)
-    return () => clearTimeout(timer)
-  }, [question.word, question.correctAnswer])
 
   const handleInputChange = (value: string) => {
     setInputValue(value)
@@ -83,7 +42,7 @@ export default function Listening({ question, onAnswer, selectedAnswer, disabled
   }
 
   return (
-    <div className="w-full flex flex-col items-center gap-8 animate-in fade-in zoom-in-95 duration-700">
+    <div className="w-full flex flex-col items-center gap-8 sm:gap-12 animate-in fade-in zoom-in-95 duration-700 pb-10">
       
       {/* HUD Header */}
       <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20">
@@ -91,36 +50,34 @@ export default function Listening({ question, onAnswer, selectedAnswer, disabled
         <span className="text-[10px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-[0.3em]">Auditory Pattern Sync</span>
       </div>
 
-      <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight text-center max-w-lg leading-tight">
+      <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight text-center max-w-2xl leading-tight px-4">
         {question.prompt}
       </h2>
 
       <Card className="w-full max-w-md bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-3xl border border-slate-200 dark:border-slate-800 shadow-2xl rounded-[40px] overflow-hidden">
-        <CardBody className="flex flex-col items-center justify-center p-12">
-          <button 
-            onClick={playAudio}
-            disabled={isAudioLoading || disabled}
-            className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500 ${
-              isPlaying ? 'bg-sky-500 shadow-[0_0_30px_rgba(56,189,248,0.5)]' : 'bg-slate-100 dark:bg-slate-800 hover:bg-sky-500/10'
-            }`}
-          >
-            {isAudioLoading ? (
-              <Spinner size="md" color="white" />
-            ) : (
-              <Volume2 className={isPlaying ? 'text-white' : 'text-sky-500'} size={40} />
-            )}
-            {isPlaying && (
-              <span className="absolute inset-0 rounded-full border-2 border-sky-500 animate-ping opacity-40"></span>
-            )}
-          </button>
-          <span className="mt-6 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Transmit Audio Signal</span>
+        <CardBody className="flex flex-col items-center justify-center p-10 sm:p-14 min-h-[280px]">
+          <div className="flex flex-col items-center gap-4">
+            <button 
+              onClick={() => handlePlay()}
+              disabled={disabled}
+              className={`relative w-32 h-32 sm:w-40 sm:h-40 rounded-full flex items-center justify-center transition-all duration-500 ${
+                isPlaying ? 'bg-sky-500 shadow-[0_0_50px_rgba(56,189,248,0.5)]' : 'bg-slate-100 dark:bg-slate-800 hover:bg-sky-500/10 border-2 border-transparent hover:border-sky-500/30 shadow-inner'
+              }`}
+            >
+              <Volume2 className={isPlaying ? 'text-white' : 'text-sky-500'} size={64} />
+              {isPlaying && (
+                <span className="absolute inset-0 rounded-full border-2 border-sky-500 animate-ping opacity-40"></span>
+              )}
+            </button>
+            <span className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Play Audio Signal ({playbackSpeed}x)</span>
+          </div>
         </CardBody>
       </Card>
 
-      <div className="w-full max-w-xl space-y-4">
-        <div className="flex items-center gap-2 px-2">
+      <div className="w-full max-w-2xl space-y-6 px-2">
+        <div className="flex items-center gap-4 px-4">
           <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800" />
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Select Output</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] whitespace-nowrap">Neural Response</span>
           <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800" />
         </div>
 
@@ -136,10 +93,10 @@ export default function Listening({ question, onAnswer, selectedAnswer, disabled
                 <button 
                   onClick={() => onAnswer(option)}
                   disabled={disabled}
-                  className={`w-full h-20 text-xl font-bold rounded-2xl border-2 transition-all duration-300 ${
+                  className={`w-full h-20 text-xl font-bold rounded-[24px] border-2 transition-all duration-300 ${
                     selectedAnswer === option 
                       ? 'bg-sky-500 border-sky-400 text-white shadow-xl shadow-sky-500/30 -translate-y-1' 
-                      : 'bg-white/50 dark:bg-white/5 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-sky-500/50'
+                      : 'bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-sky-500/50'
                   }`}
                 >
                   {option}
@@ -151,15 +108,15 @@ export default function Listening({ question, onAnswer, selectedAnswer, disabled
           <div className="relative group">
             <Input
               type="text"
-              placeholder="Decode the signal..."
+              placeholder="Initialize linguistic output..."
               value={inputValue}
               onValueChange={handleInputChange}
               className="w-full"
               size="lg"
               variant="bordered"
               classNames={{
-                input: "text-center text-xl font-bold uppercase tracking-widest",
-                inputWrapper: "h-20 rounded-2xl border-2 border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-[#050b14]/50 backdrop-blur-xl group-hover:border-sky-500/50 transition-all shadow-inner"
+                input: "text-center text-xl sm:text-2xl font-bold uppercase tracking-widest py-10",
+                inputWrapper: "h-24 sm:h-32 rounded-[32px] border-2 border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-[#050b14]/50 backdrop-blur-xl group-hover:border-sky-500/50 group-focus-within:border-sky-500 transition-all shadow-inner"
               }}
               isDisabled={disabled}
             />
