@@ -1,5 +1,5 @@
 // app/api/ai/chat/route.ts
-import { openai, OPENAI_CHAT_MODEL } from '@/lib/openai/client'
+import { openai, OPENAI_CHAT_MODEL, ensureOpenAIConfigured } from '@/lib/openai/client'
 import { createClient } from '@/lib/supabase/server'
 import { redis } from '@/lib/upstash/redis'
 import { NextResponse } from 'next/server'
@@ -17,6 +17,9 @@ const chatRequestSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // Ensure OpenAI is properly configured
+    ensureOpenAIConfigured()
+
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
