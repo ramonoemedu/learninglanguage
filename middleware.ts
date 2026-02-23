@@ -7,9 +7,33 @@ export async function middleware(request: NextRequest) {
     request,
   })
 
+  const { pathname } = request.nextUrl
+
+  // Public routes — no auth needed
+  const isPublicRoute = pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname === '/' ||
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/system-specs') ||
+    pathname.startsWith('/auth/callback')
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (isPublicRoute) {
+      return supabaseResponse
+    }
+
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.searchParams.set('error', 'supabase_not_configured')
+    return NextResponse.redirect(url)
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -36,15 +60,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { pathname } = request.nextUrl
-
-  // Public routes — no auth needed
-  if (pathname.startsWith('/login') ||
-      pathname.startsWith('/register') ||
-      pathname === '/' ||
-      pathname.startsWith('/api/auth') ||
-      pathname.startsWith('/system-specs') ||
-      pathname.startsWith('/auth/callback')) {
+  if (isPublicRoute) {
     return supabaseResponse
   }
 
