@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
-import { AmbientBackground } from "./(dashboard)/layout";
+// import { AmbientBackground } from "./(dashboard)/layout"; // Removed import
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,9 +29,7 @@ export default function RootLayout({
         `}
       >
         <Providers>
-          {/* Now it will work perfectly! */}
-          <AmbientBackground />
-
+          {/* Removed AmbientBackground usage */}
           <div className="relative z-10 isolate">
             {children}
           </div>

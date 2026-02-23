@@ -1,14 +1,6 @@
-// app/api/admin/content/languages/[code]/route.ts
-import { prisma } from '@/lib/db/prisma'
 import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
-
-const updateLanguageSchema = z.object({
-  name: z.string().min(1).optional(),
-  flag: z.string().min(1).optional(),
-  active: z.boolean().optional(),
-})
 
 export async function PATCH(
   request: Request,
@@ -22,30 +14,30 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', authUser.id).single()
+    const userData = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    })
 
     if (userData?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { code } = params
     const body = await request.json()
-    const { name, flag, active } = updateLanguageSchema.parse(body)
+    const { name, flag, active } = body
 
-    const updatedLanguage = await prisma.language.update({
-      where: { code },
+    const language = await prisma.language.update({
+      where: { code: params.code },
       data: {
-        ...(name && { name }),
-        ...(flag && { flag }),
-        ...(active !== undefined && { active }),
-      },
+        name,
+        flag,
+        active
+      }
     })
-    return NextResponse.json(updatedLanguage)
+
+    return NextResponse.json(language)
   } catch (error) {
-    console.error('Error updating language (admin):', error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
-    }
+    console.error('Error updating language:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
@@ -62,19 +54,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', authUser.id).single()
+    const userData = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    })
 
     if (userData?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { code } = params
     await prisma.language.delete({
-      where: { code },
+      where: { code: params.code }
     })
-    return NextResponse.json({ message: 'Language deleted' }, { status: 200 })
+
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting language (admin):', error)
+    console.error('Error deleting language:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

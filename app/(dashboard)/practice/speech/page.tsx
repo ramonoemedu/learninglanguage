@@ -57,6 +57,22 @@ export default function SpeechLabPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const loadVoices = () => {
+      const allVoices = window.speechSynthesis.getVoices()
+      setVoices(allVoices)
+
+      if (!selectedVoiceURI && allVoices.length > 0) {
+        const meijia = allVoices.find(v => v.name.includes('Meijia') || v.lang.includes('zh-TW'))
+        const zhVoice = allVoices.find(v => v.lang.includes('zh') || v.lang.includes('cmn'))
+        const defaultVoice = meijia || zhVoice || allVoices[0]
+        if (defaultVoice) setSelectedVoiceURI(defaultVoice.voiceURI)
+      }
+    }
+    loadVoices()
+    window.speechSynthesis.onvoiceschanged = loadVoices
+  }, [selectedVoiceURI])
+
   const fetchPhrases = async () => {
     setStatus('loading')
     setErrorMessage('')
@@ -87,9 +103,8 @@ export default function SpeechLabPage() {
     utterance.lang = 'zh-CN'
     utterance.rate = playbackSpeed
 
-    const voices = window.speechSynthesis.getVoices()
-    const zhVoice = voices.find(voice => voice.lang.includes('zh') || voice.lang.includes('cmn') || voice.name.includes('Chinese'))
-    if (zhVoice) utterance.voice = zhVoice
+    const voice = voices.find(v => v.voiceURI === selectedVoiceURI)
+    if (voice) utterance.voice = voice
 
     window.speechSynthesis.speak(utterance)
   }
@@ -157,14 +172,22 @@ export default function SpeechLabPage() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-2 bg-white/40 dark:bg-white/5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-md shadow-lg">
-          <div className="relative group">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 p-2 bg-white/40 dark:bg-white/5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-md shadow-lg">
+          <div className="md:col-span-4 relative group">
             <select value={currentLevel} onChange={(e) => setCurrentLevel(Number(e.target.value))} className="w-full bg-white dark:bg-[#050b14] border-2 border-transparent hover:border-sky-500/30 rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-widest outline-none appearance-none cursor-pointer transition-all">
               {stages.map(s => <option key={s.num} value={s.num}>{`${s.level} - ${s.title}`}</option>)}
             </select>
             <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
           </div>
-          <div className="flex items-center gap-2 p-1 bg-white dark:bg-[#050b14] rounded-xl border-2 border-transparent">
+          <div className="md:col-span-4 relative group">
+            <select value={selectedVoiceURI} onChange={(e) => setSelectedVoiceURI(e.target.value)} className="w-full bg-white dark:bg-[#050b14] border-2 border-transparent hover:border-sky-500/30 rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-widest outline-none appearance-none cursor-pointer transition-all">
+              {voices.filter(v => v.lang.includes('zh') || v.lang.includes('cmn') || v.name.includes('Chinese')).map(v => (
+                <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
+          </div>
+          <div className="md:col-span-4 flex items-center gap-2 p-1 bg-white dark:bg-[#050b14] rounded-xl border-2 border-transparent">
             {[0.5, 1.0, 1.5, 2.0].map((s) => (
               <button key={s} onClick={() => setPlaybackSpeed(s)} className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black transition-all ${playbackSpeed === s ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-500 hover:bg-sky-500/10'}`}>{s}x</button>
             ))}

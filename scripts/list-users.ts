@@ -1,17 +1,17 @@
-import { PrismaClient } from '@prisma/client'
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 async function main() {
-  const users = await prisma.user.findMany()
-  console.log(JSON.stringify(users, null, 2))
+  console.log('--- User Registry ---');
+  const users = await prisma.user.findMany({
+    select: { id: true, name: true, email: true, role: true }
+  });
+  console.table(users);
 }
 
 main()
-  .catch((e) => {
-    console.error(e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

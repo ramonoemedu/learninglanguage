@@ -1,6 +1,17 @@
 // scripts/verify-seed.ts
-const { PrismaClient } = require('@prisma/client');
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
+
+interface QuestionItem {
+  word?: string;
+  pinyin?: string;
+  translation?: string;
+  targetLanguage?: string;
+  nativeLanguage?: string;
+  correctAnswer?: string;
+}
 
 async function verify() {
   console.log('--- Database Verification ---');
@@ -8,36 +19,34 @@ async function verify() {
   const vocabCount = await prisma.vocabulary.count();
   console.log(`Total Vocabulary Items: ${vocabCount}`);
 
-  // 1. Verify Greetings (Stage 1, Chapter 1)
-  const greetingsLesson = await prisma.lesson.findFirst({
-    where: { id: { contains: 'stage1-ch1' } },
-    include: { chapter: true }
-  });
-  console.log('
-[Stage 1, Chapter 1 (Greetings)]');
-  if (greetingsLesson) {
-    const questions = greetingsLesson.contentJson.questions;
-    console.log(`- Sample Words: ${questions.map(q => q.word).join(', ')}`);
-  } else {
-    console.log('- No lesson found for Stage 1, Chapter 1.');
+  const stages = [1, 2, 10];
+
+  for (const stage of stages) {
+    console.log(`\n--- Verifying Stage ${stage} Lessons ---`);
+    for (let i = 1; i <= 5; i++) {
+      const chapterId = `zh-stage${stage}-ch${i}`;
+      
+      const lessons = await prisma.lesson.findMany({
+        where: { id: { contains: chapterId } },
+        orderBy: { type: 'asc' }
+      });
+
+      if (lessons.length > 0) {
+        console.log(`\n[Chapter ${i}] Checking lessons for ${chapterId}...`);
+        lessons.forEach(lesson => {
+          const content = lesson.contentJson as any;
+          const questions = content.questions as QuestionItem[];
+          const sample = questions?.[0];
+          console.log(`  • ${lesson.type.padEnd(10)} | ${questions?.length || 0} items | Ans: ${sample?.correctAnswer || 'MISSING'} | Sample: ${sample?.word || 'N/A'}`);
+        });
+      } else if (stage === 1 || (stage === 2 && i === 1)) {
+        // Only log missing for expected chapters
+        console.log(`\n[Chapter ${i}] ❌ No lessons found for ${chapterId}`);
+      }
+    }
   }
 
-  // 2. Verify Food (Stage 2, Chapter 1)
-  const foodLesson = await prisma.lesson.findFirst({
-    where: { id: { contains: 'stage2-ch1' } },
-    include: { chapter: true }
-  });
-  console.log('
-[Stage 2, Chapter 1 (Food)]');
-  if (foodLesson) {
-    const questions = foodLesson.contentJson.questions;
-    console.log(`- Sample Words: ${questions.map(q => q.word).join(', ')}`);
-  } else {
-    console.log('- No lesson found for Stage 2, Chapter 1.');
-  }
-
-  console.log('
---- Verification Complete ---');
+  console.log('\n--- Verification Complete ---');
 }
 
 verify()

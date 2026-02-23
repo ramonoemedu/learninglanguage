@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Progress, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure, Spinner } from '@heroui/react'
 import { useRouter } from 'next/navigation'
-import { X, Heart, HeartOff, CheckCircle2, AlertCircle, ChevronRight, Zap, Sparkles, Coins, Volume2, Cpu, Activity } from 'lucide-react'
+import { X, Heart, HeartOff, CheckCircle2, AlertCircle, ChevronRight, Zap, Sparkles, Coins, Volume2, Cpu, Activity, Sun, Moon, Monitor } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import FlashCard from '@/components/lesson/FlashCard'
@@ -15,24 +15,8 @@ import Writing from '@/components/lesson/Writing'
 import Reading from '@/components/lesson/Reading'
 import Dialogue from '@/components/lesson/Dialogue'
 import GrammarExplanation from '@/components/lesson/GrammarExplanation'
-
-// REUSABLE AI LOADING HUD
-export function AILoader() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-[#020617] relative overflow-hidden">
-      <div className="relative z-10 flex flex-col items-center gap-6">
-        <div className="relative w-24 h-24">
-          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }} className="absolute inset-0 border-2 border-slate-200 dark:border-slate-800 border-t-sky-500 dark:border-t-sky-400 rounded-full" />
-          <motion.div animate={{ rotate: -360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} className="absolute inset-2 border-2 border-slate-200 dark:border-slate-800 border-b-indigo-500 dark:border-b-indigo-400 rounded-full" />
-        </div>
-        <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5 }} className="flex flex-col items-center gap-1">
-          <span className="text-sm font-bold uppercase tracking-[0.3em] text-slate-900 dark:text-white">Neural Uplink</span>
-          <span className="text-[10px] font-medium uppercase tracking-widest text-sky-600 dark:text-sky-400">Synchronizing Matrix...</span>
-        </motion.div>
-      </div>
-    </div>
-  )
-}
+import { AILoader } from '@/components/ai-loader' // Import AILoader
+import { useTheme } from 'next-themes'
 
 interface LessonQuestion {
   type: 'flashcard' | 'multiple-choice' | 'listening' | 'fill-in-the-blank' | 'speaking' | 'writing' | 'reading' | 'dialogue'
@@ -88,7 +72,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
   const { id: lessonId } = params
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [loading, setLoading] = useState(true)
-  
+
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
   const [ttsMode, setTtsMode] = useState<'ai' | 'local'>('local')
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
@@ -114,6 +98,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
   const router = useRouter()
   const { isOpen, onOpen, onOpenChange } = useDisclosure()
   const { isOpen: isSettingsOpen, onOpen: onSettingsOpen, onOpenChange: onSettingsOpenChange } = useDisclosure()
+  const { theme, setTheme } = useTheme()
   const audioCache = useRef<Map<string, string>>(new Map())
 
   // LOAD VOICES
@@ -121,13 +106,14 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices()
       setAvailableVoices(voices)
-      
+
       if (!selectedVoiceURI && voices.length > 0) {
         const saved = localStorage.getItem('neural_voice_uri')
         if (saved && voices.find(v => v.voiceURI === saved)) {
           setSelectedVoiceURI(saved)
         } else {
-          const defaultVoice = voices.find(v => v.name.includes('Premium') || v.name.includes('Enhanced')) || voices[0]
+          const meijia = voices.find(v => v.name.includes('Meijia') || v.lang.includes('zh-TW'))
+          const defaultVoice = meijia || voices.find(v => v.name.includes('Premium') || v.name.includes('Enhanced')) || voices[0]
           setSelectedVoiceURI(defaultVoice.voiceURI)
         }
       }
@@ -135,7 +121,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
 
     loadVoices()
     window.speechSynthesis.onvoiceschanged = loadVoices
-    
+
     const savedMode = localStorage.getItem('tts_mode') as 'ai' | 'local'
     if (savedMode) setTtsMode(savedMode)
   }, [selectedVoiceURI])
@@ -146,7 +132,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
       const utterance = new SpeechSynthesisUtterance(text)
       const voice = availableVoices.find(v => v.voiceURI === selectedVoiceURI)
       if (voice) utterance.voice = voice
-      
+
       if (lesson?.chapter.stage.language.code) {
         const code = lesson.chapter.stage.language.code
         utterance.lang = code === 'zh' ? 'zh-CN' : code === 'en' ? 'en-US' : code
@@ -172,38 +158,35 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
     setIsThinking(true)
     const cacheKey = `${text}_${speed.toFixed(2)}`
 
-    if (audioCache.current.has(cacheKey)) {
-      try {
-        const audio = new Audio(audioCache.current.get(cacheKey)!)
-        await new Promise((resolve, reject) => {
-          audio.onended = resolve
-          audio.onerror = reject
-          audio.play().catch(reject)
-        })
-      } catch (err) {
-        console.warn('Audio playback failed:', err)
-      } finally {
-        setIsThinking(false)
-      }
-      return
+    const playAudio = (url: string) => {
+      return new Promise<void>((resolve, reject) => {
+        const audio = new Audio(url)
+        audio.onended = () => resolve()
+        audio.onerror = () => reject(new Error('Audio playback failed'))
+        audio.play().catch(reject)
+      })
     }
 
     try {
+      if (audioCache.current.has(cacheKey)) {
+        await playAudio(audioCache.current.get(cacheKey)!)
+        return
+      }
+
       const res = await fetch('/api/ai/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, voice: 'nova', speed: speed }),
       })
+
+      if (!res.ok) throw new Error('Failed to fetch audio')
+
       const data = await res.json()
-      if (res.ok && data.audioUrl) {
+      if (data.audioUrl) {
         audioCache.current.set(cacheKey, data.audioUrl)
-        const audio = new Audio(data.audioUrl)
-        await new Promise((resolve, reject) => {
-          audio.onended = resolve
-          audio.onerror = reject
-          audio.play().catch(reject)
-        })
+        await playAudio(data.audioUrl)
       }
+
     } catch (err) {
       console.error('TTS error:', err)
     } finally {
@@ -224,7 +207,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
       } catch (err) {
         setError('Uplink failed.')
       } finally {
-        setTimeout(() => setLoading(false), 800)
+        setLoading(false)
       }
     }
     fetchLesson()
@@ -357,7 +340,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
               ))}
             </div>
 
-            <button 
+            <button
               onClick={onSettingsOpen}
               className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-slate-800 hover:border-sky-500/50 transition-all text-slate-500 hover:text-sky-500 shrink-0"
             >
@@ -394,21 +377,29 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
               )}
             </motion.div>
           ) : currentQuestion ? (
-            <motion.div 
-              key={currentIndex} 
-              initial={{ opacity: 0, x: 20 }} 
-              animate={{ opacity: 1, x: 0 }} 
-              exit={{ opacity: 0, x: -20 }} 
+            <motion.div
+              key={currentIndex}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className={`w-full ${['writing', 'reading', 'dialogue', 'listening'].includes(currentQuestion.type) ? 'max-w-4xl' : 'max-w-2xl'}`}
             >
               {currentQuestion.type === 'flashcard' && <FlashCard question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} playbackSpeed={playbackSpeed} playTTS={playTTS} />}
               {currentQuestion.type === 'multiple-choice' && <MultipleChoice question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'listening' && <Listening question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} showOptions={true} playbackSpeed={playbackSpeed} playTTS={playTTS} />}
-              {currentQuestion.type === 'speaking' && <Speaking question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} />}
+              {currentQuestion.type === 'speaking' && <Speaking question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} playTTS={playTTS} />}
               {currentQuestion.type === 'writing' && <Writing question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'fill-in-the-blank' && <FillInBlank question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'reading' && <Reading question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'dialogue' && <Dialogue question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} />}
+
+              {!currentQuestion.type && (
+                <div className="flex flex-col items-center justify-center p-10 text-rose-500 bg-rose-500/5 rounded-3xl border border-rose-500/20">
+                  <AlertCircle size={48} className="mb-4" />
+                  <p className="font-bold uppercase tracking-widest">Data Error: Missing Question Type</p>
+                  <p className="text-sm mt-2 opacity-70 font-mono">Word: {currentQuestion.word}</p>
+                </div>
+              )}
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -444,7 +435,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
           </div>
           <button
             onClick={status === 'playing' ? handleCheck : handleNext}
-            disabled={isSubmitting || (status === 'playing' && !selectedAnswer && !['speaking', 'writing', 'dialogue'].includes(currentQuestion?.type || ''))}
+            disabled={isSubmitting || (status === 'playing' && !selectedAnswer && !['speaking', 'dialogue'].includes(currentQuestion?.type || ''))}
             className={`w-full sm:min-w-[240px] sm:w-auto px-10 h-16 rounded-2xl font-black text-xl uppercase tracking-[0.2em] transition-all duration-300 ${status === 'correct' ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' :
               status === 'wrong' ? 'bg-rose-500 text-white shadow-[0_0_20px_rgba(244,63,94,0.4)]' :
                 'bg-sky-500 text-white shadow-lg hover:-translate-y-1'
@@ -456,9 +447,9 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
       </footer>
 
       {/* SETTINGS MODAL */}
-      <Modal 
-        isOpen={isSettingsOpen} 
-        onOpenChange={onSettingsOpenChange} 
+      <Modal
+        isOpen={isSettingsOpen}
+        onOpenChange={onSettingsOpenChange}
         className="dark:bg-[#050b14] border border-slate-800 max-w-md"
         backdrop="blur"
       >
@@ -472,15 +463,35 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
           <ModalBody className="pb-10">
             <div className="space-y-6">
               <div className="space-y-3">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Visual Interface</span>
+                <div className="grid grid-cols-3 gap-2 p-1 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-slate-800">
+                  {[
+                    { id: 'light', icon: Sun, label: 'Light' },
+                    { id: 'dark', icon: Moon, label: 'Dark' },
+                    { id: 'system', icon: Monitor, label: 'Auto' }
+                  ].map(({ id, icon: Icon, label }) => (
+                    <button
+                      key={id}
+                      onClick={() => setTheme(id)}
+                      className={`flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${theme === id ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                      <Icon size={14} />
+                      <span className="hidden sm:inline">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Processing Core</span>
                 <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <button 
+                  <button
                     onClick={() => { setTtsMode('ai'); localStorage.setItem('tts_mode', 'ai'); }}
                     className={`py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${ttsMode === 'ai' ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
                     Cloud AI
                   </button>
-                  <button 
+                  <button
                     onClick={() => { setTtsMode('local'); localStorage.setItem('tts_mode', 'local'); }}
                     className={`py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${ttsMode === 'local' ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
@@ -495,7 +506,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
               {ttsMode === 'local' && (
                 <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Neural Voice Signature</span>
-                  <select 
+                  <select
                     value={selectedVoiceURI}
                     onChange={(e) => { setSelectedVoiceURI(e.target.value); localStorage.setItem('neural_voice_uri', e.target.value); }}
                     className="w-full bg-white dark:bg-[#030712] border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-sky-500/50 outline-none transition-all"
@@ -510,8 +521,8 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
                     }
                     {availableVoices.length === 0 && <option>No local voices detected</option>}
                   </select>
-                  
-                  <button 
+
+                  <button
                     onClick={() => speakLocal("Transmission check. Neural link stable.", 1.0)}
                     className="w-full py-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-slate-800 text-sky-500 font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-sky-500/10 transition-all"
                   >

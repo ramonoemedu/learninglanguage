@@ -6,92 +6,10 @@ import { Header } from "@/components/Layouts/header"
 import { useUserStore } from '@/lib/stores/authStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SidebarProvider } from '@/components/Layouts/sidebar/sidebar-context'
+import { AmbientBackground } from '@/components/ambient-background' // Import AmbientBackground
 
-export function AmbientBackground() {
-  const [mounted, setMounted] = useState(false);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+// Removed AmbientBackground component definition (now in its own file)
 
-  useEffect(() => {
-    setMounted(true);
-    const handleMouseMove = (e: MouseEvent) => {
-      requestAnimationFrame(() => {
-        setMousePosition({ x: e.clientX, y: e.clientY });
-      });
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  if (!mounted) return null;
-
-  return (
-    <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-slate-50 dark:bg-[#020617] transition-colors duration-1000">
-      
-      {/* 1. Subtle Perspective Grid */}
-      <div 
-        className="absolute inset-0 opacity-[0.15] dark:opacity-[0.2]"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, rgba(148, 163, 184, 0.2) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(148, 163, 184, 0.2) 1px, transparent 1px)
-          `,
-          backgroundSize: '4rem 4rem',
-          transform: 'perspective(1000px) rotateX(60deg) translateY(-10%)',
-          maskImage: 'radial-gradient(circle at center, black, transparent 80%)',
-          WebkitMaskImage: 'radial-gradient(circle at center, black, transparent 80%)',
-        }}
-      />
-
-      {/* 2. Neural Network Points (Subtle dots) */}
-      <div 
-        className="absolute inset-0 opacity-[0.3] dark:opacity-[0.4]"
-        style={{
-          backgroundImage: `radial-gradient(circle at 2px 2px, rgba(56, 189, 248, 0.2) 1px, transparent 0)`,
-          backgroundSize: '2rem 2rem',
-        }}
-      />
-
-      {/* 3. Cinematic Breathing Orbs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[70%] h-[70%] bg-sky-400/10 dark:bg-sky-500/10 rounded-full blur-[120px] animate-orb-breathe" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-[120px] animate-orb-breathe-reverse" />
-      
-      {/* 4. Interactive Mouse Glow (Very faint, elegant) */}
-      <div
-        className="absolute inset-0 z-10 opacity-40"
-        style={{
-          background: `radial-gradient(1000px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(56, 189, 248, 0.03), transparent 60%)`
-        }}
-      />
-
-      {/* 5. Tiny Floating Particles */}
-      <div className="absolute inset-0">
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-sky-400/30 rounded-full blur-[1px]"
-            initial={{ 
-              x: Math.random() * 100 + "%", 
-              y: Math.random() * 100 + "%",
-              opacity: Math.random() * 0.5
-            }}
-            animate={{ 
-              y: [null, "-20px", "0px"],
-              opacity: [0.2, 0.5, 0.2]
-            }}
-            transition={{ 
-              duration: 5 + Math.random() * 5, 
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-        ))}
-      </div>
-
-    </div>
-  );
-}
-
-// 2. MAIN LAYOUT
 export default function DashboardLayout({
   children,
 }: {
@@ -121,7 +39,7 @@ export default function DashboardLayout({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-[#020617] relative overflow-hidden transition-colors duration-1000">
-        <AmbientBackground />
+        <AmbientBackground /> {/* Re-added usage */}
         <div className="relative z-10 flex flex-col items-center gap-6">
           <div className="relative w-20 h-20">
             <motion.div 
@@ -147,7 +65,7 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <div className="relative flex min-h-screen bg-transparent text-slate-900 dark:text-white selection:bg-sky-500/30 selection:text-sky-600 dark:selection:text-sky-200 overflow-hidden">
-        <AmbientBackground />
+        <AmbientBackground /> {/* Re-added usage */}
 
         <Sidebar />
 

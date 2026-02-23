@@ -8,10 +8,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 interface WritingProps {
   question: {
-    prompt: string
+    prompt?: string
     correctAnswer: string
     targetLanguage: string
     nativeLanguage: string
+    word?: string
+    translation?: string
   }
   onAnswer: (answer: string, score?: number) => void
   disabled?: boolean
@@ -35,7 +37,7 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
           prompt: question.prompt,
           targetLanguage: question.targetLanguage,
           nativeLanguage: question.nativeLanguage,
-          correctAnswer: question.correctAnswer,
+          correctAnswer: question.word || question.correctAnswer,
         }),
       })
 
@@ -58,7 +60,7 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
 
   return (
     <div className="w-full flex flex-col items-center gap-8 animate-in fade-in zoom-in-95 duration-700">
-      
+
       {/* HUD HEADER */}
       <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20">
         <BrainCircuit size={12} className="text-sky-500" />
@@ -67,16 +69,16 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
 
       <div className="text-center space-y-2 max-w-3xl">
         <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight px-4">
-          {question.prompt}
+          {question.prompt || question.translation || "Translate the following"}
         </h2>
         <div className="flex justify-center gap-4">
-           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-             <Terminal size={10} /> Target: {question.targetLanguage.toUpperCase()}
-           </span>
-           <div className="w-[1px] h-3 bg-slate-200 dark:bg-slate-800" />
-           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-             <Activity size={10} /> Linguistic Sync
-           </span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+            <Terminal size={10} /> Target: {question.targetLanguage.toUpperCase()}
+          </span>
+          <div className="w-[1px] h-3 bg-slate-200 dark:bg-slate-800" />
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+            <Activity size={10} /> Linguistic Sync
+          </span>
         </div>
       </div>
 
@@ -85,11 +87,14 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
           <div className="relative">
             <Textarea
               value={userText}
-              onValueChange={setUserText}
+              onValueChange={(val) => {
+                setUserText(val)
+                onAnswer(val)
+              }}
               placeholder={
                 question.targetLanguage === 'zh' ? "Type in Chinese... (e.g. 你好, 谢谢)" :
-                question.targetLanguage === 'km' ? "Type in Khmer... (e.g. សួស្តី)" :
-                "Type in English... (e.g. dog, cat, weather)"
+                  question.targetLanguage === 'km' ? "Type in Khmer... (e.g. សួស្តី)" :
+                    "Type in English... (e.g. dog, cat, weather)"
               }
               minRows={6}
               maxRows={8}
@@ -99,7 +104,7 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
                 inputWrapper: "bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border-2 border-slate-200/50 dark:border-slate-800/50 focus-within:border-sky-500 ring-0 outline-none rounded-[32px] sm:rounded-[40px] p-0 transition-all duration-300 shadow-2xl dark:shadow-[0_0_40px_rgba(56,189,248,0.03)] min-h-[320px] items-center"
               }}
             />
-            
+
             {/* Technical HUD Overlay for Input */}
             <div className="absolute bottom-6 right-8 sm:bottom-10 sm:right-12 flex items-center gap-4 pointer-events-none opacity-40 group-focus-within:opacity-100 transition-opacity">
               <div className="flex flex-col items-end">
@@ -125,11 +130,10 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
                 onClick={handleGradeWriting}
                 isLoading={loading}
                 isDisabled={disabled || userText.trim().length < 5}
-                className={`w-full h-20 rounded-[24px] font-black text-xl uppercase tracking-[0.3em] transition-all duration-500 ${
-                  userText.trim().length >= 5 
-                    ? 'bg-sky-500 text-white shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:shadow-[0_0_50px_rgba(56,189,248,0.5)] hover:-translate-y-1' 
-                    : 'bg-slate-100 dark:bg-white/5 text-slate-400 grayscale'
-                }`}
+                className={`w-full h-20 rounded-[24px] font-black text-xl uppercase tracking-[0.3em] transition-all duration-500 ${userText.trim().length >= 5
+                  ? 'bg-sky-500 text-white shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:shadow-[0_0_50px_rgba(56,189,248,0.5)] hover:-translate-y-1'
+                  : 'bg-slate-100 dark:bg-white/5 text-slate-400 grayscale'
+                  }`}
               >
                 {loading ? 'Processing Matrix...' : (
                   <span className="flex items-center gap-3">

@@ -3,16 +3,16 @@
 
 import { Card, CardBody, Input, Spinner } from '@heroui/react'
 import { Volume2, Headphones } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 
 interface ListeningProps {
   question: {
-    prompt: string
+    prompt?: string
     audioUrl?: string
     options?: string[]
     correctAnswer: string
-    word?: string 
+    word?: string
     languageCode?: string
   }
   onAnswer: (answer: string) => void
@@ -36,6 +36,14 @@ export default function Listening({ question, onAnswer, selectedAnswer, disabled
     setIsPlaying(false)
   }
 
+  // 🔊 AUTO-PLAY ON MOUNT
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handlePlay()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [question.word, question.correctAnswer])
+
   const handleInputChange = (value: string) => {
     setInputValue(value)
     onAnswer(value)
@@ -43,7 +51,7 @@ export default function Listening({ question, onAnswer, selectedAnswer, disabled
 
   return (
     <div className="w-full flex flex-col items-center gap-8 sm:gap-12 animate-in fade-in zoom-in-95 duration-700 pb-10">
-      
+
       {/* HUD Header */}
       <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20">
         <Headphones size={12} className="text-sky-500 animate-pulse" />
@@ -51,18 +59,17 @@ export default function Listening({ question, onAnswer, selectedAnswer, disabled
       </div>
 
       <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight text-center max-w-2xl leading-tight px-4">
-        {question.prompt}
+        {question.prompt || question.word || "Listen and select the correct answer"}
       </h2>
 
       <Card className="w-full max-w-md bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-3xl border border-slate-200 dark:border-slate-800 shadow-2xl rounded-[40px] overflow-hidden">
         <CardBody className="flex flex-col items-center justify-center p-10 sm:p-14 min-h-[280px]">
           <div className="flex flex-col items-center gap-4">
-            <button 
+            <button
               onClick={() => handlePlay()}
               disabled={disabled}
-              className={`relative w-32 h-32 sm:w-40 sm:h-40 rounded-full flex items-center justify-center transition-all duration-500 ${
-                isPlaying ? 'bg-sky-500 shadow-[0_0_50px_rgba(56,189,248,0.5)]' : 'bg-slate-100 dark:bg-slate-800 hover:bg-sky-500/10 border-2 border-transparent hover:border-sky-500/30 shadow-inner'
-              }`}
+              className={`relative w-32 h-32 sm:w-40 sm:h-40 rounded-full flex items-center justify-center transition-all duration-500 ${isPlaying ? 'bg-sky-500 shadow-[0_0_50px_rgba(56,189,248,0.5)]' : 'bg-slate-100 dark:bg-slate-800 hover:bg-sky-500/10 border-2 border-transparent hover:border-sky-500/30 shadow-inner'
+                }`}
             >
               <Volume2 className={isPlaying ? 'text-white' : 'text-sky-500'} size={64} />
               {isPlaying && (
@@ -90,14 +97,13 @@ export default function Listening({ question, onAnswer, selectedAnswer, disabled
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 + i * 0.05 }}
               >
-                <button 
+                <button
                   onClick={() => onAnswer(option)}
                   disabled={disabled}
-                  className={`w-full h-20 text-xl font-bold rounded-[24px] border-2 transition-all duration-300 ${
-                    selectedAnswer === option 
-                      ? 'bg-sky-500 border-sky-400 text-white shadow-xl shadow-sky-500/30 -translate-y-1' 
-                      : 'bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-sky-500/50'
-                  }`}
+                  className={`w-full h-20 text-xl font-bold rounded-[24px] border-2 transition-all duration-300 ${selectedAnswer === option
+                    ? 'bg-sky-500 border-sky-400 text-white shadow-xl shadow-sky-500/30 -translate-y-1'
+                    : 'bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-sky-500/50'
+                    }`}
                 >
                   {option}
                 </button>

@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ phrases: content })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to fetch practice phrases:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }

@@ -6,7 +6,7 @@ import { useState } from 'react'
 
 interface FillInBlankProps {
   question: {
-    prompt: string
+    prompt?: string
     blankedSentence: string
     correctAnswer: string
     hint?: string
@@ -30,8 +30,7 @@ export default function FillInBlank({ question, onAnswer, selectedAnswer, disabl
 
   return (
     <div className="w-full flex flex-col items-center gap-10 animate-in fade-in duration-500">
-      <h2 className="text-2xl font-bold">{question.prompt}</h2>
-
+      <h2 className="text-2xl font-bold">{question.prompt || "Fill in the blank"}</h2>
       <div className="flex flex-col items-center gap-4 w-full max-w-md">
         <div className="text-3xl font-bold text-center">
           {sentenceParts[0]}

@@ -1,12 +1,13 @@
+// app/login/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Button, Input, Card, CardHeader, CardBody, CardFooter } from '@heroui/react'
+import { Button, Input } from '@heroui/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Languages, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, Languages, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -83,23 +84,24 @@ export default function LoginPage() {
   }
 
   return (
-    // Matching the dark background of the new landing page
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-[#030712] text-white overflow-hidden px-4 font-sans">
+    <div className="relative min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-[#030712] text-slate-900 dark:text-white overflow-hidden px-4 font-sans transition-colors duration-500">
 
-      {/* 1. Interactive Mouse Glow Effect */}
+      {/* --- 1. Interactive Mouse Glow Effect --- */}
       {mounted && (
         <div
-          className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-300"
+          className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-300 mix-blend-screen dark:mix-blend-lighten"
           style={{
-            background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(56, 189, 248, 0.08), transparent 40%)`
+            background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(56, 189, 248, 0.06), transparent 40%)`
           }}
         />
       )}
 
-      {/* 2. Static Ambient Background Orbs */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none opacity-40">
-        <div className="absolute top-[-10%] right-[-5%] w-[40rem] h-[40rem] bg-sky-500/10 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-[35rem] h-[35rem] bg-blue-600/10 rounded-full blur-[100px] animate-pulse delay-700" />
+      {/* --- 2. Ambient AI Background (Grid + Orbs) --- */}
+      <div className="fixed inset-0 z-0 pointer-events-none bg-[linear-gradient(to_right,rgba(15,23,42,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(56,189,248,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(56,189,248,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
+
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+        <div className="absolute top-[-10%] right-[-5%] w-[40rem] h-[40rem] bg-sky-500/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] left-[-5%] w-[35rem] h-[35rem] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse delay-700" />
       </div>
 
       <motion.div
@@ -108,157 +110,161 @@ export default function LoginPage() {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="w-full max-w-md z-10"
       >
-        {/* Sleek, frosted glass card without harsh borders */}
-        <Card className="border border-slate-800 bg-[#030712]/60 backdrop-blur-2xl shadow-[0_0_40px_-10px_rgba(56,189,248,0.15)] p-2 sm:p-4 rounded-3xl">
-          <CardHeader className="flex flex-col items-center pb-6 pt-8">
-            <div className="w-16 h-16 bg-gradient-to-tr from-sky-400 to-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-sky-500/20">
+        {/* --- Glassmorphic Auth Panel --- */}
+        <div className="bg-white/70 dark:bg-[#030712]/60 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl dark:shadow-[0_0_40px_-10px_rgba(56,189,248,0.15)] p-6 sm:p-8 rounded-[2rem] transition-all duration-300">
+
+          {/* Header */}
+          <header className="flex flex-col items-center pb-6">
+            <div className="w-16 h-16 bg-gradient-to-tr from-sky-400 to-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-sky-500/30 dark:shadow-sky-500/20 transform hover:scale-105 transition-transform duration-300">
               <Languages className="text-white w-8 h-8" />
             </div>
-            {/* Softened typography */}
-            <h1 className="text-2xl font-bold tracking-tight text-white">Welcome Back</h1>
-            <p className="text-slate-400 mt-2 font-medium text-sm">Continue your path to fluency</p>
-          </CardHeader>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Welcome Back</h1>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mt-2">Initialize Session</p>
+          </header>
 
-          <CardBody className="px-6 py-4">
-            <form onSubmit={handleLogin} className="flex flex-col gap-6">
+          <main>
+            <form onSubmit={handleLogin} className="flex flex-col gap-5">
 
-              {/* --- CUSTOM EMAIL INPUT --- */}
-              <div className="flex flex-col gap-2 group">
-                <label
-                  htmlFor="email-input"
-                  className="text-xs font-bold uppercase tracking-widest text-slate-500 group-focus-within:text-sky-400 transition-colors ml-1"
-                >
-                  Email Address
-                </label>
-                <Input
+              {/* Email Input */}
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-500 dark:group-focus-within:text-sky-400 transition-colors" />
+
+                <input
                   id="email-input"
-                  aria-label="Email Address"
                   type="email"
-                  variant="bordered"
-                  placeholder="you@example.com"
+                  placeholder="sys.admin@domain.com"
                   value={email}
-                  onValueChange={setEmail}
-                  startContent={<Mail className="w-5 text-slate-500 transition-colors group-focus-within:text-sky-400" />}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
-                  fullWidth
                   autoComplete="email"
-                  classNames={{
-                    innerWrapper: "gap-3", // <-- Adds perfect spacing between the icon and the text
-                    inputWrapper: [
-                      "h-14",
-                      "px-4", // Adds padding to the sides so it doesn't touch the edges
-                      "rounded-xl",
-                      "bg-[#050b14]/80",
-                      "border-2 border-slate-800/80",
-                      "transition-all duration-300 ease-out",
-                      "hover:border-slate-600 hover:bg-[#050b14]",
-                      // We use HeroUI's native data focus state to override the default white border!
-                      "data-[focus=true]:!border-sky-500",
-                      "data-[focus=true]:!shadow-[0_0_20px_rgba(56,189,248,0.15)]",
-                    ].join(" "),
-                    input: "text-white text-base font-medium placeholder:text-slate-600",
-                  }}
+                  className="
+      w-full h-14 pl-11 pr-4 rounded-xl
+      bg-white/50 dark:bg-[#050b14]/80
+      border border-slate-200/80 dark:border-slate-800/80
+      text-slate-900 dark:text-white text-sm font-medium
+      placeholder:text-slate-400 dark:placeholder:text-slate-600
+      transition-all duration-300 ease-out
+      hover:border-slate-300 dark:hover:border-slate-600
+      focus:border-sky-500 focus:outline-none
+      focus:shadow-sm dark:focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]
+    "
                 />
               </div>
 
-              {/* --- CUSTOM PASSWORD INPUT --- */}
-              <div className="flex flex-col gap-2 group">
-                <label
-                  htmlFor="password-input"
-                  className="text-xs font-bold uppercase tracking-widest text-slate-500 group-focus-within:text-sky-400 transition-colors ml-1"
-                >
-                  Password
-                </label>
-                <Input
+              {/* Password Input */}
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-500 dark:group-focus-within:text-sky-400 transition-colors" />
+
+                <input
                   id="password-input"
-                  aria-label="Password"
                   type={isVisible ? "text" : "password"}
-                  variant="bordered"
                   placeholder="••••••••"
                   value={password}
-                  onValueChange={setPassword}
-                  startContent={<Lock className="w-5 text-slate-500 transition-colors group-focus-within:text-sky-400" />}
-                  endContent={
-                    <button className="focus:outline-none" type="button" onClick={toggleVisibility}>
-                      {isVisible ? (
-                        <EyeOff className="w-5 text-slate-500 transition-colors hover:text-slate-300" />
-                      ) : (
-                        <Eye className="w-5 text-slate-500 transition-colors hover:text-slate-300" />
-                      )}
-                    </button>
-                  }
+                  onChange={(e) => setPassword(e.target.value)}
                   required
-                  fullWidth
                   autoComplete="current-password"
-                  classNames={{
-                    innerWrapper: "gap-3", // <-- Adds perfect spacing between the icon and the text
-                    inputWrapper: [
-                      "h-14",
-                      "px-4",
-                      "rounded-xl",
-                      "bg-[#050b14]/80",
-                      "border-2 border-slate-800/80",
-                      "transition-all duration-300 ease-out",
-                      "hover:border-slate-600 hover:bg-[#050b14]",
-                      "data-[focus=true]:!border-sky-500",
-                      "data-[focus=true]:!shadow-[0_0_20px_rgba(56,189,248,0.15)]",
-                    ].join(" "),
-                    input: `text-white text-base font-medium placeholder:text-slate-600 ${!isVisible ? "tracking-[0.2em]" : ""}`,
-                  }}
+                  className={`
+      w-full h-14 pl-11 pr-12 rounded-xl
+      bg-white/50 dark:bg-[#050b14]/80
+      border border-slate-200/80 dark:border-slate-800/80
+      text-slate-900 dark:text-white text-sm font-medium
+      placeholder:text-slate-400 dark:placeholder:text-slate-600
+      transition-all duration-300 ease-out
+      hover:border-slate-300 dark:hover:border-slate-600
+      focus:border-sky-500 focus:outline-none
+      focus:shadow-sm dark:focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]
+      ${!isVisible ? "tracking-[0.2em]" : ""}
+    `}
                 />
+
+                <button
+                  type="button"
+                  onClick={toggleVisibility}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  {isVisible ? (
+                    <EyeOff className="w-4 h-4 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
+                  )}
+                </button>
               </div>
 
               {/* Error Message */}
               {error && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-sm font-medium text-rose-400 bg-rose-500/10 p-3 rounded-xl flex items-center gap-2 border border-rose-500/20"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 p-3 rounded-xl flex items-center gap-2 border border-rose-200 dark:border-rose-500/20"
                 >
-                  <span className="text-rose-500">⚠️</span> {error}
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {error}
                 </motion.div>
               )}
 
               {/* Submit Button */}
-              <Button
+              <button
                 type="submit"
-                className="w-full h-12 bg-sky-500 text-white font-semibold text-base rounded-xl shadow-[0_0_20px_rgba(56,189,248,0.3)] mt-2 transition-all hover:bg-sky-400 hover:-translate-y-0.5"
-                isLoading={loading}
+                disabled={loading}
+                className={`
+    w-full h-12 mt-2 rounded-xl text-sm font-bold tracking-wide
+    bg-sky-500 text-white
+    shadow-md shadow-sky-500/20
+    dark:shadow-[0_0_20px_rgba(56,189,248,0.3)]
+    transition-all duration-300 ease-out
+    hover:bg-sky-400 hover:-translate-y-0.5
+    disabled:opacity-70 disabled:cursor-not-allowed
+    flex items-center justify-center gap-2
+  `}
               >
-                Sign In
-              </Button>
+                {loading && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {loading ? "Authenticating..." : "Authenticate"}
+              </button>
             </form>
 
-            <div className="relative flex items-center py-8">
-              <div className="flex-grow border-t border-slate-800"></div>
-              <span className="flex-shrink mx-4 text-xs font-medium text-slate-500 uppercase tracking-widest">Or continue with</span>
-              <div className="flex-grow border-t border-slate-800"></div>
+            {/* Divider */}
+            <div className="relative flex items-center py-6 mt-2">
+              <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+              <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Or Bridge With</span>
+              <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
             </div>
 
-            <Button
-              className="w-full h-12 bg-slate-900/50 text-white font-medium border border-slate-800 hover:bg-slate-800 transition-all rounded-xl"
+            {/* Google Auth Button */}
+            <button
+              type="button"
               onClick={handleGoogleLogin}
-              startContent={
-                <svg className="w-5 h-5 mr-1" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                  <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
-              }
+              className="
+    w-full h-12 rounded-xl
+    bg-white/50 dark:bg-slate-900/50
+    text-slate-700 dark:text-white font-medium
+    border border-slate-200/80 dark:border-slate-800
+    hover:bg-slate-100 dark:hover:bg-slate-800
+    hover:-translate-y-0.5
+    transition-all duration-300 ease-out
+    flex items-center justify-center gap-2
+  "
             >
-              Google
-            </Button>
-          </CardBody>
-          <CardFooter className="flex flex-col items-center pb-8 pt-4">
-            <p className="text-slate-400 font-medium text-sm">
-              New learner?{' '}
-              <Link href="/register" className="text-sky-400 hover:text-sky-300 transition-colors font-semibold">
-                Create an account
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+              </svg>
+              Google Workspace
+            </button>
+          </main>
+
+          <footer className="flex flex-col items-center pt-8">
+            <p className="text-slate-500 dark:text-slate-400 font-medium text-xs">
+              No existing profile?{' '}
+              <Link href="/register" className="text-sky-500 dark:text-sky-400 hover:text-sky-600 dark:hover:text-sky-300 transition-colors font-bold underline decoration-sky-500/30 underline-offset-4">
+                Initialize new account
               </Link>
             </p>
-          </CardFooter>
-        </Card>
+          </footer>
+
+        </div>
       </motion.div>
     </div>
   )

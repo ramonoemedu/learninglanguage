@@ -1,15 +1,6 @@
-// app/api/admin/content/lessons/[id]/route.ts
-import { prisma } from '@/lib/db/prisma'
 import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
-
-const updateLessonSchema = z.object({
-  type: z.enum(['vocab', 'grammar', 'listen', 'speak', 'write', 'read', 'dialogue']).optional(),
-  contentJson: z.any().optional(),
-  xpReward: z.number().int().min(0).optional(),
-  coinReward: z.number().int().min(0).optional(),
-})
 
 export async function PATCH(
   request: Request,
@@ -23,26 +14,32 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', authUser.id).single()
+    const userData = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    })
 
     if (userData?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { id } = params
     const body = await request.json()
-    const updatedFields = updateLessonSchema.parse(body)
+    const { chapterId, type, contentJson, xpReward, coinReward } = body
 
-    const updatedLesson = await prisma.lesson.update({
-      where: { id },
-      data: updatedFields,
+    const lesson = await prisma.lesson.update({
+      where: { id: params.id },
+      data: {
+        chapterId,
+        type,
+        contentJson,
+        xpReward: Number(xpReward),
+        coinReward: Number(coinReward)
+      }
     })
-    return NextResponse.json(updatedLesson)
+
+    return NextResponse.json(lesson)
   } catch (error) {
-    console.error('Error updating lesson (admin):', error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
-    }
+    console.error('Error updating lesson:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
@@ -59,19 +56,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', authUser.id).single()
+    const userData = await prisma.user.findUnique({ where: { id: authUser.id }, select: { role: true } })
 
-    if (userData?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { id } = params
-    await prisma.lesson.delete({
-      where: { id },
-    })
-    return NextResponse.json({ message: 'Lesson deleted' }, { status: 200 })
+    await prisma.lesson.delete({ where: { id: params.id } })
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting lesson (admin):', error)
+    console.error('Error deleting lesson:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

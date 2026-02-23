@@ -1,13 +1,6 @@
-// app/api/admin/users/[id]/route.ts
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
-
-const updateUserSchema = z.object({
-  role: z.enum(['learner', 'admin', 'tester']).optional(),
-  plan: z.enum(['free', 'pro', 'tester']).optional(),
-})
 
 export async function PATCH(
   request: Request,
@@ -21,29 +14,56 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', authUser.id).single()
+    // Verify admin role using Prisma (Source of Truth)
+    const adminUser = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    })
 
-    if (userData?.role !== 'admin') {
+    if (adminUser?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
-    const { role, plan } = updateUserSchema.parse(body)
+    const { name, email, role, xpTotal, coins } = body
+
+    const updateData: any = {}
+    if (name) updateData.name = name
+    if (email) updateData.email = email
+    if (role) updateData.role = role
+    if (typeof xpTotal === 'number') updateData.xpTotal = xpTotal
+    if (typeof coins === 'number') updateData.coins = coins
 
     const updatedUser = await prisma.user.update({
       where: { id: params.id },
-      data: {
-        ...(role && { role }),
-        ...(plan && { plan }),
-      },
+      data: updateData
     })
 
     return NextResponse.json(updatedUser)
   } catch (error) {
-    console.error('Error updating user (admin):', error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
-    }
+    console.error('Error updating user:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = await createClient()
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: authUser?.id },
+      select: { role: true }
+    })
+
+    if (adminUser?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    await prisma.user.delete({ where: { id: params.id } })
+    return NextResponse.json({ success: true })
+  } catch (error) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

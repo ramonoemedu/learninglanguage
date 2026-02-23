@@ -2,10 +2,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Button, Card, CardBody, Avatar, Spinner } from '@heroui/react'
+import { Button, Avatar, Spinner } from '@heroui/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, UserCircle, Trophy, ChevronRight } from 'lucide-react'
+import { ChevronLeft, UserCircle, Trophy, ChevronRight, Zap, Coins, Flame, LogOut } from 'lucide-react'
 
 interface User {
   id: string
@@ -39,75 +39,124 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner size="lg" />
+      <div className="relative overflow-hidden min-h-screen bg-slate-50 dark:bg-[#030712] flex items-center justify-center">
+        {/* Ambient Grid Background */}
+        <div className="fixed inset-0 z-0 pointer-events-none bg-[linear-gradient(to_right,rgba(15,23,42,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(56,189,248,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(56,189,248,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
+        <Spinner size="lg" color="primary" className="relative z-10" />
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-default-500">User not found or not logged in.</p>
-        <Button onClick={() => router.push('/login')}>Go to Login</Button>
+      <div className="relative overflow-hidden min-h-screen bg-slate-50 dark:bg-[#030712] flex flex-col items-center justify-center gap-6">
+        <div className="fixed inset-0 z-0 pointer-events-none bg-[linear-gradient(to_right,rgba(15,23,42,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(56,189,248,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(56,189,248,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
+        <p className="text-slate-500 dark:text-slate-400 relative z-10 text-sm font-medium">System anomaly detected: User record not found.</p>
+        <Button
+          onClick={() => router.push('/login')}
+          className="relative z-10 bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 text-slate-900 dark:text-white shadow-sm dark:shadow-[0_0_20px_rgba(56,189,248,0.05)] transition-all duration-300 hover:-translate-y-0.5"
+        >
+          Initialize Login
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6">
-      <header className="max-w-4xl mx-auto flex items-center justify-between mb-6 sm:mb-8">
-        <div className="flex items-center gap-3 sm:gap-4">
+    <div className="relative overflow-hidden min-h-screen bg-slate-50 dark:bg-[#030712] p-4 sm:p-6 text-slate-900 dark:text-white">
+      {/* --- Ambient AI Background Effects --- */}
+      <div className="fixed inset-0 z-0 pointer-events-none bg-[linear-gradient(to_right,rgba(15,23,42,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.03)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(56,189,248,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(56,189,248,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-sky-500/10 blur-[120px] z-0 pointer-events-none animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-500/10 blur-[120px] z-0 pointer-events-none animate-pulse delay-1000" />
+
+      {/* --- Header --- */}
+      <header className="relative z-10 max-w-4xl mx-auto flex items-center justify-between mb-8 sm:mb-12 pt-4">
+        <div className="flex items-center gap-4">
           <Link href="/dashboard">
-            <Button variant="light" isIconOnly size="sm">
-              <ChevronLeft size={20} />
-            </Button>
+            <button className="p-2 rounded-xl bg-white/50 dark:bg-[#050b14]/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-sm dark:hover:shadow-[0_0_15px_rgba(56,189,248,0.15)] group">
+              <ChevronLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
+            </button>
           </Link>
-          <h1 className="text-xl sm:text-2xl font-bold">Profile</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Profile Data</h1>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto flex flex-col gap-4 sm:gap-6">
-        <Card className="p-4 sm:p-6 flex flex-col items-center gap-3 sm:gap-4">
-          <Avatar 
-            src={user.avatarUrl} 
-            fallback={<UserCircle size={48} />} 
-            className="w-20 h-20 sm:w-24 sm:h-24 text-primary text-3xl sm:text-4xl"
+      {/* --- Main Content --- */}
+      <main className="relative z-10 max-w-4xl mx-auto flex flex-col gap-6 sm:gap-8">
+
+        {/* User Stats Card */}
+        <div className="bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-md dark:shadow-[0_0_20px_rgba(56,189,248,0.05)] rounded-2xl p-6 sm:p-10 flex flex-col items-center gap-4 transition-all duration-300 ease-out hover:shadow-lg dark:hover:shadow-[0_0_30px_rgba(56,189,248,0.1)]">
+
+          <Avatar
+            src={user.avatarUrl}
+            fallback={<UserCircle size={48} />}
+            className="w-24 h-24 sm:w-28 sm:h-28 text-sky-500 text-4xl shadow-md ring-4 ring-white/50 dark:ring-[#050b14]/50"
             isBordered
             color="primary"
           />
-          <h2 className="text-xl sm:text-2xl font-bold">{user.name}</h2>
-          <p className="text-sm text-default-500">{user.email}</p>
-          <div className="flex gap-4 sm:gap-8 mt-2 sm:mt-4">
-            <div className="flex flex-col items-center">
-              <span className="text-lg sm:text-2xl font-bold">{user.xpTotal}</span>
-              <span className="text-xs sm:text-sm text-default-500">Total XP</span>
+
+          <div className="text-center mt-2">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">{user.name}</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{user.email}</p>
+          </div>
+
+          <div className="w-full h-px bg-slate-200/50 dark:bg-slate-800/50 my-4" />
+
+          {/* HUD Stats Grid */}
+          <div className="grid grid-cols-3 w-full gap-4 sm:gap-8 px-2 sm:px-8">
+            <div className="flex flex-col items-center group">
+              <div className="flex items-center gap-2 mb-1 text-sky-500 dark:text-sky-400">
+                <Zap size={18} className="group-hover:scale-110 transition-transform duration-300 ease-out" />
+                <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{user.xpTotal}</span>
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Total XP</span>
             </div>
-            <div className="flex flex-col items-center">
-              <span className="text-lg sm:text-2xl font-bold">{user.coins}</span>
-              <span className="text-xs sm:text-sm text-default-500">Coins</span>
+
+            <div className="flex flex-col items-center group">
+              <div className="flex items-center gap-2 mb-1 text-amber-500 dark:text-amber-400">
+                <Coins size={18} className="group-hover:scale-110 transition-transform duration-300 ease-out" />
+                <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{user.coins}</span>
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Credits</span>
             </div>
-            <div className="flex flex-col items-center">
-              <span className="text-lg sm:text-2xl font-bold">{user.streakDays}</span>
-              <span className="text-xs sm:text-sm text-default-500">Streak Days</span>
+
+            <div className="flex flex-col items-center group">
+              <div className="flex items-center gap-2 mb-1 text-orange-500 dark:text-orange-400">
+                <Flame size={18} className="group-hover:scale-110 transition-transform duration-300 ease-out" />
+                <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{user.streakDays}</span>
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Streak</span>
             </div>
           </div>
-        </Card>
+        </div>
 
-        <Card isPressable onClick={() => router.push('/profile/achievements')} className="p-3 sm:p-4">
-          <CardBody className="flex justify-between items-center">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <Trophy size={20} className="text-warning" />
-              <span className="text-base sm:text-lg font-medium">Achievements</span>
+        {/* Action List */}
+        <div className="flex flex-col gap-4">
+          <button
+            onClick={() => router.push('/profile/achievements')}
+            className="group w-full bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm dark:shadow-[0_0_20px_rgba(56,189,248,0.05)] rounded-xl p-4 sm:p-5 flex justify-between items-center transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-sky-500/30 dark:hover:shadow-[0_0_25px_rgba(56,189,248,0.15)]"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 rounded-xl bg-sky-500/10 dark:bg-sky-400/10 text-sky-500 dark:text-sky-400 group-hover:scale-110 group-hover:bg-sky-500/20 transition-all duration-300 ease-out">
+                <Trophy size={20} />
+              </div>
+              <span className="text-sm font-medium">Achievements & Logs</span>
             </div>
-            <ChevronRight size={20} className="text-default-400" />
-          </CardBody>
-        </Card>
+            <ChevronRight size={20} className="text-slate-400 group-hover:text-sky-500 dark:group-hover:text-sky-400 transition-colors duration-300" />
+          </button>
+        </div>
 
-        {/* Other profile settings/links here */}
-        <Button color="danger" variant="ghost" onClick={() => { /* Logout logic */ }} className="w-full">
-          Log Out
-        </Button>
+        {/* Danger Zone */}
+        <div className="mt-8">
+          <button
+            onClick={() => { /* Logout logic */ }}
+            className="group w-full bg-red-500/5 dark:bg-red-500/10 hover:bg-red-500/10 dark:hover:bg-red-500/20 backdrop-blur-xl border border-red-200/50 dark:border-red-500/20 rounded-xl p-4 flex justify-center items-center gap-2 transition-all duration-300 ease-out hover:-translate-y-0.5 text-red-600 dark:text-red-400 font-medium text-sm"
+          >
+            <LogOut size={18} className="group-hover:-translate-x-1 transition-transform duration-300" />
+            <span>Terminate Session</span>
+          </button>
+        </div>
+
       </main>
     </div>
   )

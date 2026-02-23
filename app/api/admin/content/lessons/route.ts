@@ -1,18 +1,8 @@
-// app/api/admin/content/lessons/route.ts
-import { prisma } from '@/lib/db/prisma'
 import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 
-const lessonSchema = z.object({
-  chapterId: z.string().min(1),
-  type: z.enum(['vocab', 'grammar', 'listen', 'speak', 'write', 'read', 'dialogue']),
-  contentJson: z.any(), // Flexible JSON content for lessons
-  xpReward: z.number().int().min(0).default(10),
-  coinReward: z.number().int().min(0).default(5),
-})
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
@@ -21,7 +11,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', authUser.id).single()
+    const userData = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    })
 
     if (userData?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -33,22 +26,22 @@ export async function GET() {
           include: {
             stage: {
               include: {
-                language: true,
-              },
-            },
-          },
-        },
+                language: true
+              }
+            }
+          }
+        }
       },
       orderBy: [
         { chapter: { stage: { language: { name: 'asc' } } } },
         { chapter: { stage: { stageNumber: 'asc' } } },
-        { chapter: { chapterNum: 'asc' } },
-        { type: 'asc' },
-      ],
+        { chapter: { chapterNum: 'asc' } }
+      ]
     })
+
     return NextResponse.json(lessons)
   } catch (error) {
-    console.error('Error fetching lessons (admin):', error)
+    console.error('Error fetching lessons:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
@@ -62,27 +55,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', authUser.id).single()
+    const userData = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    })
 
     if (userData?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
-    const newLesson = lessonSchema.parse(body)
+    const { chapterId, type, contentJson, xpReward, coinReward } = body
 
-    const createdLesson = await prisma.lesson.create({
+    const lesson = await prisma.lesson.create({
       data: {
-        ...newLesson,
-        contentJson: newLesson.contentJson || {}, // Ensure contentJson is always an object
-      },
+        chapterId,
+        type,
+        contentJson,
+        xpReward: Number(xpReward) || 10,
+        coinReward: Number(coinReward) || 5
+      }
     })
-    return NextResponse.json(createdLesson, { status: 201 })
+
+    return NextResponse.json(lesson)
   } catch (error) {
-    console.error('Error creating lesson (admin):', error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
-    }
+    console.error('Error creating lesson:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

@@ -19,7 +19,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', authUser.id).single()
+    const userData = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    })
 
     if (userData?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -51,7 +54,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', authUser.id).single()
+    const userData = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    })
 
     if (userData?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
