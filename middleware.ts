@@ -43,6 +43,7 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith('/register') ||
       pathname === '/' ||
       pathname.startsWith('/api/auth') ||
+      pathname.startsWith('/system-specs') ||
       pathname.startsWith('/auth/callback')) {
     return supabaseResponse
   }

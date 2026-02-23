@@ -2,12 +2,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Button, Input } from '@heroui/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Languages, Eye, EyeOff, AlertTriangle } from 'lucide-react'
+import { Mail, Lock, Languages, Eye, EyeOff, AlertTriangle, ChevronLeft } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -20,7 +19,6 @@ export default function LoginPage() {
   const [isVisible, setIsVisible] = useState(false)
   const toggleVisibility = () => setIsVisible(!isVisible)
 
-  // Mouse tracking for the ambient glow effect
   const [mounted, setMounted] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
@@ -39,7 +37,6 @@ export default function LoginPage() {
     setError('')
 
     try {
-      console.log('Attempting login for:', email)
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -51,8 +48,6 @@ export default function LoginPage() {
       if (contentType && contentType.includes('application/json')) {
         data = await res.json()
       } else {
-        const text = await res.text()
-        console.error('Non-JSON response received:', text)
         throw new Error('Server returned an unexpected response format')
       }
 
@@ -60,10 +55,8 @@ export default function LoginPage() {
         throw new Error(data?.error || 'Failed to login')
       }
 
-      console.log('Login successful, redirecting...')
       router.push('/dashboard')
     } catch (err: any) {
-      console.error('Login error detail:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -85,6 +78,17 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-[#030712] text-slate-900 dark:text-white overflow-hidden px-4 font-sans transition-colors duration-500">
+
+      {/* --- Floating Escape Hatch (Fixed Positioning) --- */}
+      <Link
+        href="/"
+        className="absolute top-6 left-6 sm:top-8 sm:left-8 z-50 group flex items-center gap-2 px-4 py-2 bg-white/50 dark:bg-[#050b14]/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 rounded-xl transition-all duration-300 hover:bg-white dark:hover:bg-[#050b14] shadow-sm hover:shadow-md hover:-translate-x-1"
+      >
+        <ChevronLeft size={16} className="text-slate-500 dark:text-slate-400 group-hover:text-sky-500 transition-colors duration-300" />
+        <span className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+          Return to Hub
+        </span>
+      </Link>
 
       {/* --- 1. Interactive Mouse Glow Effect --- */}
       {mounted && (
@@ -126,9 +130,8 @@ export default function LoginPage() {
             <form onSubmit={handleLogin} className="flex flex-col gap-5">
 
               {/* Email Input */}
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-500 dark:group-focus-within:text-sky-400 transition-colors" />
-
+              <div className="relative group">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-500 dark:group-focus-within:text-sky-400 transition-colors pointer-events-none" />
                 <input
                   id="email-input"
                   type="email"
@@ -137,24 +140,13 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  className="
-      w-full h-14 pl-11 pr-4 rounded-xl
-      bg-white/50 dark:bg-[#050b14]/80
-      border border-slate-200/80 dark:border-slate-800/80
-      text-slate-900 dark:text-white text-sm font-medium
-      placeholder:text-slate-400 dark:placeholder:text-slate-600
-      transition-all duration-300 ease-out
-      hover:border-slate-300 dark:hover:border-slate-600
-      focus:border-sky-500 focus:outline-none
-      focus:shadow-sm dark:focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]
-    "
+                  className="w-full h-14 pl-11 pr-4 rounded-xl bg-white/50 dark:bg-[#050b14]/80 border border-slate-200/80 dark:border-slate-800/80 text-slate-900 dark:text-white text-sm font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all duration-300 ease-out hover:border-slate-300 dark:hover:border-slate-600 focus:border-sky-500 focus:outline-none focus:shadow-sm dark:focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]"
                 />
               </div>
 
               {/* Password Input */}
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-500 dark:group-focus-within:text-sky-400 transition-colors" />
-
+              <div className="relative group">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-sky-500 dark:group-focus-within:text-sky-400 transition-colors pointer-events-none" />
                 <input
                   id="password-input"
                   type={isVisible ? "text" : "password"}
@@ -163,24 +155,12 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className={`
-      w-full h-14 pl-11 pr-12 rounded-xl
-      bg-white/50 dark:bg-[#050b14]/80
-      border border-slate-200/80 dark:border-slate-800/80
-      text-slate-900 dark:text-white text-sm font-medium
-      placeholder:text-slate-400 dark:placeholder:text-slate-600
-      transition-all duration-300 ease-out
-      hover:border-slate-300 dark:hover:border-slate-600
-      focus:border-sky-500 focus:outline-none
-      focus:shadow-sm dark:focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]
-      ${!isVisible ? "tracking-[0.2em]" : ""}
-    `}
+                  className={`w-full h-14 pl-11 pr-12 rounded-xl bg-white/50 dark:bg-[#050b14]/80 border border-slate-200/80 dark:border-slate-800/80 text-slate-900 dark:text-white text-sm font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all duration-300 ease-out hover:border-slate-300 dark:hover:border-slate-600 focus:border-sky-500 focus:outline-none focus:shadow-sm dark:focus:shadow-[0_0_20px_rgba(56,189,248,0.15)] ${!isVisible ? "tracking-[0.2em]" : ""}`}
                 />
-
                 <button
                   type="button"
                   onClick={toggleVisibility}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
                 >
                   {isVisible ? (
                     <EyeOff className="w-4 h-4 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
@@ -205,16 +185,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className={`
-    w-full h-12 mt-2 rounded-xl text-sm font-bold tracking-wide
-    bg-sky-500 text-white
-    shadow-md shadow-sky-500/20
-    dark:shadow-[0_0_20px_rgba(56,189,248,0.3)]
-    transition-all duration-300 ease-out
-    hover:bg-sky-400 hover:-translate-y-0.5
-    disabled:opacity-70 disabled:cursor-not-allowed
-    flex items-center justify-center gap-2
-  `}
+                className="w-full h-12 mt-2 rounded-xl text-sm font-bold tracking-wide bg-sky-500 text-white shadow-[0_4px_15px_rgba(56,189,248,0.3)] transition-all duration-300 ease-out hover:bg-sky-400 hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading && (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -234,16 +205,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={handleGoogleLogin}
-              className="
-    w-full h-12 rounded-xl
-    bg-white/50 dark:bg-slate-900/50
-    text-slate-700 dark:text-white font-medium
-    border border-slate-200/80 dark:border-slate-800
-    hover:bg-slate-100 dark:hover:bg-slate-800
-    hover:-translate-y-0.5
-    transition-all duration-300 ease-out
-    flex items-center justify-center gap-2
-  "
+              className="w-full h-12 rounded-xl bg-white/50 dark:bg-slate-900/50 text-slate-700 dark:text-white font-medium border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 hover:-translate-y-0.5 transition-all duration-300 ease-out flex items-center justify-center gap-2 shadow-sm"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />

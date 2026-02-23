@@ -87,13 +87,26 @@ export default function ProfilePage() {
         {/* User Stats Card */}
         <div className="bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-md dark:shadow-[0_0_20px_rgba(56,189,248,0.05)] rounded-2xl p-6 sm:p-10 flex flex-col items-center gap-4 transition-all duration-300 ease-out hover:shadow-lg dark:hover:shadow-[0_0_30px_rgba(56,189,248,0.1)]">
 
-          <Avatar
-            src={user.avatarUrl}
-            fallback={<UserCircle size={48} />}
-            className="w-24 h-24 sm:w-28 sm:h-28 text-sky-500 text-4xl shadow-md ring-4 ring-white/50 dark:ring-[#050b14]/50"
-            isBordered
-            color="primary"
-          />
+          <div className="relative flex items-center justify-center group mb-4">
+            {/* 1. Ambient Holographic Aura */}
+            <div className="absolute inset-0 bg-sky-500/20 dark:bg-sky-400/20 blur-xl rounded-full group-hover:bg-sky-500/40 dark:group-hover:bg-sky-400/30 group-hover:blur-2xl transition-all duration-700 ease-out" />
+
+            {/* 2. Outer HUD Tracking Ring (Rotates slowly) */}
+            <div className="absolute -inset-3 rounded-full border-2 border-dashed border-sky-500/20 dark:border-sky-400/20 animate-[spin_12s_linear_infinite] group-hover:border-sky-500/50 dark:group-hover:border-sky-400/50 transition-colors duration-500" />
+
+            {/* 3. Inner Containment Ring */}
+            <div className="absolute -inset-1 rounded-full border border-sky-500/10 dark:border-sky-400/10 shadow-[inset_0_0_20px_rgba(56,189,248,0.1)]" />
+
+            {/* 4. Core Avatar Image */}
+            <Avatar
+              src={user.avatarUrl}
+              fallback={<UserCircle size={48} strokeWidth={1.5} />}
+              className="relative z-10 w-24 h-24 sm:w-28 sm:h-28 bg-white/80 dark:bg-[#050b14]/80 backdrop-blur-xl text-sky-500 dark:text-sky-400 shadow-md dark:shadow-[0_0_25px_rgba(56,189,248,0.2)] ring-1 ring-white/50 dark:ring-slate-700/50 transition-transform duration-500 group-hover:scale-105"
+            />
+
+            {/* 5. Online/Sync Status Node (Optional: Adds to the telemetry feel) */}
+            <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 w-4 h-4 rounded-full bg-emerald-400 border-[3px] border-white dark:border-[#050b14] shadow-[0_0_10px_rgba(52,211,153,0.8)] z-20" />
+          </div>
 
           <div className="text-center mt-2">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">{user.name}</h2>
