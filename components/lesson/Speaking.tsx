@@ -114,7 +114,12 @@ export default function Speaking({ question, onAnswer, disabled, playTTS }: Spea
         <CardBody className="flex flex-col items-center justify-center p-10 sm:p-16">
 
           <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em] mb-8">{question.prompt || "Speak the sentence"}</h2>
-
+          <motion.p
+            animate={{ scale: isPlayingNative ? 1.05 : 1 }}
+            className="text-sky-500 dark:text-sky-400 text-3xl sm:text-4xl font-black mb-4 tracking-tight"
+          >
+            {question.pinyin || question.correctAnswer}
+          </motion.p>
           {/* 1. PRONUNCIATION HIERARCHY */}
           <motion.p
             animate={{ scale: isPlayingNative ? 1.05 : 1 }}

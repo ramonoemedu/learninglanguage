@@ -36,10 +36,16 @@ export async function GET(
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 })
     }
 
-    // If it's a vocab lesson, we might want to fetch actual vocabulary data 
-    // linked to this lesson. For now, we'll return the contentJson.
+    // Ensure contentJson is parsed as object, not string
+    let contentJson = lesson.contentJson
+    if (typeof contentJson === 'string') {
+      contentJson = JSON.parse(contentJson as any)
+    }
     
-    return NextResponse.json(lesson)
+    return NextResponse.json({
+      ...lesson,
+      contentJson
+    })
   } catch (error) {
     console.error('Error fetching lesson:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

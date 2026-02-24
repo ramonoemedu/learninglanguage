@@ -4,6 +4,7 @@ import { create } from 'zustand'
 interface Language {
   name: string
   flag: string
+  active: boolean
 }
 
 interface EnrolledLanguage {

@@ -19,7 +19,8 @@ import { AILoader } from '@/components/ai-loader' // Import AILoader
 import { useTheme } from 'next-themes'
 
 interface LessonQuestion {
-  type: 'flashcard' | 'multiple-choice' | 'listening' | 'fill-in-the-blank' | 'speaking' | 'writing' | 'reading' | 'dialogue'
+  type: 'flashcard' | 'multiple-choice' | 'listen' | 'fill-in-the-blank' | 'speaking' | 'writing' | 'reading' | 'dialogue' | 'grammar' | 'vocab'
+  id?: string
   word?: string
   romanization?: string
   translation?: string
@@ -197,14 +198,27 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
   useEffect(() => {
     const fetchLesson = async () => {
       try {
+        console.log('📚 Fetching lesson:', lessonId)
         const res = await fetch(`/api/lessons/${lessonId}`)
+        console.log('📡 Response status:', res.status)
         if (!res.ok) throw new Error('Failed to load')
         const data = await res.json()
+        console.log('✅ Lesson loaded:', data)
+
+        // IMPORTANT: Parse contentJson if it's a string
+        if (typeof data.contentJson === 'string') {
+          console.log('⚠️  Parsing stringified contentJson...')
+          data.contentJson = JSON.parse(data.contentJson)
+        }
+
         setLesson(data)
         const qCount = data.contentJson?.questions?.length || 0
+        console.log('❓ Questions count:', qCount)
+        console.log('🔍 First question type:', data.contentJson?.questions?.[0]?.type)
         setTotalQuestions(qCount)
         if (qCount === 0) setError('Matrix empty.')
       } catch (err) {
+        console.error('❌ Error fetching lesson:', err)
         setError('Uplink failed.')
       } finally {
         setLoading(false)
@@ -283,6 +297,8 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
     <div className="flex flex-col items-center justify-center h-screen bg-slate-50 dark:bg-[#030712] p-6 text-center">
       <AlertCircle size={48} className="text-rose-500 mb-4" />
       <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">System Error</h2>
+      <p className="text-sm text-slate-500 mt-4 font-mono">{error || 'Lesson not found'}</p>
+      <p className="text-xs text-slate-400 mt-2">ID: {lessonId}</p>
       <button onClick={() => router.back()} className="mt-8 px-8 py-4 rounded-2xl bg-sky-500 text-white font-black uppercase tracking-widest text-sm shadow-lg">Restore Link</button>
     </div>
   )
@@ -382,14 +398,13 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className={`w-full ${['writing', 'reading', 'dialogue', 'listening'].includes(currentQuestion.type) ? 'max-w-4xl' : 'max-w-2xl'}`}
+              className={`w-full ${['writing', 'reading', 'dialogue', 'listen'].includes(currentQuestion.type) ? 'max-w-4xl' : 'max-w-2xl'}`}
             >
-              {currentQuestion.type === 'flashcard' && <FlashCard question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} playbackSpeed={playbackSpeed} playTTS={playTTS} />}
-              {currentQuestion.type === 'multiple-choice' && <MultipleChoice question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
-              {currentQuestion.type === 'listening' && <Listening question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} showOptions={true} playbackSpeed={playbackSpeed} playTTS={playTTS} />}
+              {currentQuestion.type === 'vocab' && <FlashCard question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} playbackSpeed={playbackSpeed} playTTS={playTTS} />}
+              {currentQuestion.type === 'grammar' && <MultipleChoice question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
+              {currentQuestion.type === 'listen' && <Listening question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} showOptions={true} playbackSpeed={playbackSpeed} playTTS={playTTS} />}
               {currentQuestion.type === 'speaking' && <Speaking question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} playTTS={playTTS} />}
               {currentQuestion.type === 'writing' && <Writing question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} />}
-              {currentQuestion.type === 'fill-in-the-blank' && <FillInBlank question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'reading' && <Reading question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'dialogue' && <Dialogue question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} />}
 
@@ -397,7 +412,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
                 <div className="flex flex-col items-center justify-center p-10 text-rose-500 bg-rose-500/5 rounded-3xl border border-rose-500/20">
                   <AlertCircle size={48} className="mb-4" />
                   <p className="font-bold uppercase tracking-widest">Data Error: Missing Question Type</p>
-                  <p className="text-sm mt-2 opacity-70 font-mono">Word: {currentQuestion.word}</p>
+                  <p className="text-sm mt-2 opacity-70 font-mono">{currentQuestion.prompt || currentQuestion.word || 'Unknown'}</p>
                 </div>
               )}
             </motion.div>

@@ -10,6 +10,17 @@ import { useState, useEffect } from 'react'
 export default function DashboardPage() {
   const { user } = useUserStore()
   const router = useRouter()
+  const [selectedLanguageId, setSelectedLanguageId] = useState<string | null>(null)
+
+  // Filter only active languages
+  const activeEnrolledLanguages = user?.enrolledLanguages?.filter(el => el.language.active) || []
+
+  // Set default language on mount
+  useEffect(() => {
+    if (activeEnrolledLanguages[0] && !selectedLanguageId) {
+      setSelectedLanguageId(activeEnrolledLanguages[0].id)
+    }
+  }, [user?.enrolledLanguages, selectedLanguageId])
 
   // 3D Spatial Tilt Logic
   const x = useMotionValue(0)
@@ -36,17 +47,17 @@ export default function DashboardPage() {
     y.set(0)
   }
 
-  // Get the most relevant next step
-  const activeLang = user?.enrolledLanguages?.[0]
-  const nextLessonUrl = activeLang 
+  // Get the currently selected language (only from active languages)
+  const activeLang = activeEnrolledLanguages.find(lang => lang.id === selectedLanguageId) || activeEnrolledLanguages[0]
+  const nextLessonUrl = activeLang
     ? `/learn/${activeLang.languageCode}` // Ideally this points to the exact next lesson ID
     : '/learn'
 
   return (
     <div className="w-full space-y-12 pb-20 relative z-10">
-      
+
       {/* 1. THE AGENTIC NEXUS (HERO WIDGET) */}
-      <section 
+      <section
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         style={{ perspective: "1200px" }}
@@ -59,9 +70,9 @@ export default function DashboardPage() {
           {/* Animated Background Mesh */}
           <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-sky-500/5 rounded-full blur-[120px] -mr-40 -mt-40 animate-pulse" />
-          
+
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            
+
             {/* Left: Intelligence Diagnostics */}
             <div className="space-y-8">
               <div className="space-y-2">
@@ -70,7 +81,7 @@ export default function DashboardPage() {
                   <span className="text-[10px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-[0.3em]">AI Co-Pilot Active</span>
                 </div>
                 <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white leading-[1.1] tracking-tight">
-                  Neural Sync <br /> 
+                  Neural Sync <br />
                   <span className="text-sky-500 dark:text-sky-400">Calibration</span>
                 </h1>
               </div>
@@ -83,14 +94,33 @@ export default function DashboardPage() {
                   </div>
                   <p className="text-lg font-black text-slate-900 dark:text-white">Optimal</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-white/5 border border-slate-200 dark:border-slate-800/50">
+                <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-white/5 border border-slate-200 dark:border-slate-800/50 cursor-pointer hover:border-indigo-500/50 transition-colors" onClick={() => setSelectedLanguageId(activeLang?.id || null)}>
                   <div className="flex items-center gap-2 mb-1">
                     <Cpu size={14} className="text-indigo-500" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Next Module</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Module</span>
                   </div>
                   <p className="text-lg font-black text-slate-900 dark:text-white truncate">
                     {activeLang?.language.name || 'New Matrix'}
                   </p>
+                  {activeEnrolledLanguages && activeEnrolledLanguages.length > 1 && (
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-slate-800/50">
+                      {activeEnrolledLanguages.map(lang => (
+                        <button
+                          key={lang.id}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedLanguageId(lang.id)
+                          }}
+                          className={`text-[8px] px-2 py-1 rounded-lg font-bold uppercase tracking-wider transition-all ${selectedLanguageId === lang.id
+                              ? 'bg-indigo-500 text-white'
+                              : 'bg-slate-100 dark:bg-slate-900/50 text-slate-600 dark:text-slate-400 hover:bg-indigo-500/20'
+                            }`}
+                        >
+                          {lang.language.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -114,25 +144,25 @@ export default function DashboardPage() {
             <div className="relative flex items-center justify-center">
               <div className="absolute w-64 h-64 bg-sky-500/20 rounded-full blur-[80px] animate-pulse" />
               <div className="relative w-48 h-48 md:w-64 md:h-64 flex items-center justify-center">
-                <motion.div 
+                <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 border-[3px] border-dashed border-sky-500/30 rounded-full" 
+                  className="absolute inset-0 border-[3px] border-dashed border-sky-500/30 rounded-full"
                 />
-                <motion.div 
+                <motion.div
                   animate={{ rotate: -360 }}
                   transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-4 border-[1px] border-indigo-500/40 rounded-full" 
+                  className="absolute inset-4 border-[1px] border-indigo-500/40 rounded-full"
                 />
                 <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl bg-white dark:bg-[#030712] border-2 border-sky-500 shadow-[0_0_40px_rgba(56,189,248,0.4)] flex items-center justify-center text-5xl md:text-6xl">
                   {activeLang?.language.flag || '🧠'}
                 </div>
-                
+
                 {/* Floating HUD Points */}
                 {[...Array(4)].map((_, i) => (
                   <motion.div
                     key={i}
-                    animate={{ 
+                    animate={{
                       y: [0, -10, 0],
                       opacity: [0.4, 1, 0.4]
                     }}
@@ -192,7 +222,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {user?.enrolledLanguages?.map((el, i) => (
+          {activeEnrolledLanguages.map((el, i) => (
             <motion.div
               key={el.id}
               initial={{ opacity: 0, x: -20 }}
@@ -201,7 +231,7 @@ export default function DashboardPage() {
               className="group relative overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-2xl p-8 hover:-translate-y-1 transition-all duration-300"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-sky-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              
+
               <div className="relative z-10 flex flex-col gap-8">
                 <div className="flex justify-between items-start">
                   <div className="flex gap-5">

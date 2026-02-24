@@ -57,10 +57,22 @@ export default function Listening({ question, onAnswer, selectedAnswer, disabled
         <Headphones size={12} className="text-sky-500 animate-pulse" />
         <span className="text-[10px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-[0.3em]">Auditory Pattern Sync</span>
       </div>
+      <div className="flex flex-col items-center gap-2 px-4">
+        <motion.p
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+          className="text-lg sm:text-xl font-medium text-slate-500 dark:text-slate-400 text-center"
+        >
+          {question.prompt || "Listen and select the correct answer"}
+        </motion.p>
+        <motion.h2
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+          className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight text-center max-w-2xl leading-tight"
+        >
+          {question.word || "Awaiting Audio..."}
+        </motion.h2>
+      </div>
 
-      <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight text-center max-w-2xl leading-tight px-4">
-        {question.prompt || question.word || "Listen and select the correct answer"}
-      </h2>
+
 
       <Card className="w-full max-w-md bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-3xl border border-slate-200 dark:border-slate-800 shadow-2xl rounded-[40px] overflow-hidden">
         <CardBody className="flex flex-col items-center justify-center p-10 sm:p-14 min-h-[280px]">
