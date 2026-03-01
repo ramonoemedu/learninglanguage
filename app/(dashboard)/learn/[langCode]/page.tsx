@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { use } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Lock, CheckCircle2, Sparkles, Target, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { useLanguage, useUserProgress } from '@/lib/hooks/useLanguageData'
 
 interface Chapter {
   id: string
@@ -37,32 +38,12 @@ interface UserProgress {
 
 export default function LearnPage({ params }: { params: { langCode: string } }) {
   const { langCode } = params
-  const [language, setLanguage] = useState<Language | null>(null)
-  const [progress, setProgress] = useState<UserProgress | null>(null)
-  const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [langRes, progRes] = await Promise.all([
-          fetch(`/api/languages/${langCode}`),
-          fetch(`/api/users/me/progress/${langCode}`)
-        ])
+  const { data: language, error: langError, isLoading: langLoading } = useLanguage(langCode)
+  const { data: progress, error: progError, isLoading: progLoading } = useUserProgress(langCode)
 
-        const langData = await langRes.json()
-        const progData = await progRes.json()
-
-        setLanguage(langData)
-        setProgress(progData)
-      } catch (err) {
-        console.error('Failed to load data', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [langCode])
+  const loading = langLoading || progLoading
 
   if (loading || !language || !progress) {
     return (

@@ -23,11 +23,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const { stageId, chapterNum, title } = body
 
     const chapter = await prisma.chapter.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         stageId,
         chapterNum,
@@ -56,7 +57,9 @@ export async function DELETE(
 
     if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    await prisma.chapter.delete({ where: { id: params.id } })
+    const { id } = await params
+
+    await prisma.chapter.delete({ where: { id } })
 
     return NextResponse.json({ success: true })
   } catch (error) {

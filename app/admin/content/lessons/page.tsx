@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { Spinner, Tooltip } from '@heroui/react'
 import { Plus, Edit2, Trash2, Eye, Cpu, Globe, Layers, BookOpen, Zap, Coins, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useAdminLessons } from '@/lib/hooks/useLessons'
+import { mutate as globalMutate } from 'swr'
 
 interface Language {
   id: string
@@ -36,9 +38,12 @@ interface Lesson {
 }
 
 export default function AdminLessonsPage() {
-  const [lessons, setLessons] = useState<Lesson[]>([])
+  const router = useRouter()
+  
+  // ✅ Goal 1: Client-Side SWR (Instant Navigation)
+  const { data: lessons, error, isLoading: loading, mutate } = useAdminLessons()
+  
   const [chapters, setChapters] = useState<Chapter[]>([])
-  const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 20
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -46,7 +51,6 @@ export default function AdminLessonsPage() {
   const [newLesson, setNewLesson] = useState({
     chapterId: '', type: 'vocab', contentJson: {}, xpReward: 10, coinReward: 5
   })
-  const router = useRouter()
 
   // Close on ESC
   useEffect(() => {
@@ -58,31 +62,18 @@ export default function AdminLessonsPage() {
   }, [isModalOpen]);
 
   useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const [lessonsRes, chaptersRes] = await Promise.all([
-        fetch('/api/admin/content/lessons'),
-        fetch('/api/admin/content/chapters')
-      ])
-
-      if (!lessonsRes.ok) throw new Error('Failed to fetch lessons')
-      if (!chaptersRes.ok) throw new Error('Failed to fetch chapters')
-
-      const lessonsData = await lessonsRes.json()
-      const chaptersData = await chaptersRes.json()
-
-      setLessons(lessonsData)
-      setChapters(chaptersData)
-    } catch (err) {
-      console.error('Error fetching data:', err)
-    } finally {
-      setLoading(false)
+    const fetchChapters = async () => {
+      try {
+        const res = await fetch('/api/admin/content/chapters')
+        if (!res.ok) throw new Error('Failed to fetch chapters')
+        const data = await res.json()
+        setChapters(data)
+      } catch (err) {
+        console.error('Error fetching chapters:', err)
+      }
     }
-  }
+    fetchChapters()
+  }, [])
 
   const openAddModal = () => {
     setEditingLesson(null)
@@ -129,7 +120,11 @@ export default function AdminLessonsPage() {
       }
 
       if (!res.ok) throw new Error('Failed to save lesson')
-      fetchData()
+      
+      // ✅ Goal 4: Optimistic UI update + cache revalidation
+      await mutate()
+      globalMutate(`/api/chapters/${payload.chapterId}/lessons`)
+      
       setIsModalOpen(false)
     } catch (err) {
       console.error('Error saving lesson:', err)
@@ -143,7 +138,10 @@ export default function AdminLessonsPage() {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error('Failed to delete lesson')
-      fetchData()
+      
+      // ✅ Goal 4: Optimistic UI update + cache revalidation
+      await mutate()
+      
     } catch (err) {
       console.error('Error deleting lesson:', err)
     }
@@ -151,11 +149,11 @@ export default function AdminLessonsPage() {
 
   const lessonTypes = ['vocab', 'grammar', 'listen', 'speak', 'write', 'read', 'dialogue']
 
-  const totalPages = Math.ceil(lessons.length / itemsPerPage)
-  const currentLessons = lessons.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const totalPages = Math.ceil((lessons?.length || 0) / itemsPerPage)
+  const currentLessons = lessons?.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) || []
 
-  // Shared Input Styles for the Modal
-  const inputBase = "w-full bg-white/50 dark:bg-[#030712]/50 border border-slate-200/80 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600 focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)] outline-none transition-all duration-300 rounded-xl h-12 px-4 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600"
+  // Styles for the Modal
+  const inputBase = "w-full bg-white/50 dark:bg-[#030712]/50 border border-slate-200/80 dark:border-slate-800/80 hover:border-slate-300 dark:border:bg-slate-600 focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)] outline-none transition-all duration-300 rounded-xl h-12 px-4 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600"
 
   // Helper for rendering glowing type badges
   const renderTypeBadge = (type: string) => {
@@ -173,6 +171,14 @@ export default function AdminLessonsPage() {
       <span className={`inline-flex px-2.5 py-1 rounded-md border text-[10px] font-bold uppercase tracking-widest ${style}`}>
         {type}
       </span>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <span className="text-red-500">Failed to load lessons</span>
+      </div>
     )
   }
 
@@ -226,7 +232,7 @@ export default function AdminLessonsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200/50 dark:divide-slate-800/50">
-              {currentLessons.map((lesson) => (
+              {currentLessons.map((lesson: Lesson) => (
                 <tr key={lesson.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors duration-200">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">

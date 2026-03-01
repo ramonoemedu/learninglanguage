@@ -2,6 +2,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
+import { redis, cacheKeys, cacheTTL } from '@/lib/cache/redis'
+
+export const revalidate = 0 // Disable Next.js static caching
 
 export async function GET(
   request: Request,
@@ -16,7 +19,33 @@ export async function GET(
     }
 
     const { id: chapterId } = await params
+    const cacheKey = cacheKeys.chapterLessons(chapterId)
 
+    // 1. Check Redis cache first (excluding user-specific completion data)
+    const cached = await redis.get(cacheKey)
+    
+    // 2. Always fetch user progress (user-specific, not cacheable globally)
+    const completedLessons = await prisma.userProgress.findMany({
+      where: { userId: user.id },
+      select: { lessonId: true },
+    })
+    const completedLessonIds = completedLessons.map(p => p.lessonId)
+
+    if (cached) {
+      console.log(`✅ Cache HIT for chapter lessons: ${chapterId}`)
+      const chapter = cached as any
+      return NextResponse.json({
+        ...chapter,
+        lessons: chapter.lessons.map((lesson: any) => ({
+          ...lesson,
+          completed: completedLessonIds.includes(lesson.id),
+        }))
+      })
+    }
+
+    console.log(`❌ Cache MISS for chapter lessons: ${chapterId}`)
+
+    // 3. Fetch from database
     const chapter = await prisma.chapter.findUnique({
       where: { id: chapterId },
       include: {
@@ -28,14 +57,11 @@ export async function GET(
       return NextResponse.json({ error: 'Chapter not found' }, { status: 404 })
     }
 
-    // Get list of completed lesson IDs for this user
-    const completedLessons = await prisma.userProgress.findMany({
-      where: { userId: user.id },
-      select: { lessonId: true },
-    })
+    // 4. Store base chapter data in Redis (without user-specific completion)
+    await redis.setex(cacheKey, cacheTTL.chapterLessons, chapter)
+    console.log(`💾 Cached chapter lessons: ${chapterId}`)
 
-    const completedLessonIds = completedLessons.map(p => p.lessonId)
-
+    // 5. Merge with user progress
     return NextResponse.json({
       ...chapter,
       lessons: chapter.lessons.map(lesson => ({

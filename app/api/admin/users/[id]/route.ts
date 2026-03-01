@@ -24,6 +24,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const { name, email, role, xpTotal, coins } = body
 
@@ -35,7 +36,7 @@ export async function PATCH(
     if (typeof coins === 'number') updateData.coins = coins
 
     const updatedUser = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData
     })
 
@@ -61,7 +62,9 @@ export async function DELETE(
 
     if (adminUser?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    await prisma.user.delete({ where: { id: params.id } })
+    const { id } = await params
+
+    await prisma.user.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

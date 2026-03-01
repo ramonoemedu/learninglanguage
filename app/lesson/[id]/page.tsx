@@ -17,6 +17,7 @@ import Dialogue from '@/components/lesson/Dialogue'
 import GrammarExplanation from '@/components/lesson/GrammarExplanation'
 import { AILoader } from '@/components/ai-loader' // Import AILoader
 import { useTheme } from 'next-themes'
+import { useLesson } from '@/lib/hooks/useLessons'
 
 interface LessonQuestion {
   type: 'flashcard' | 'multiple-choice' | 'listen' | 'fill-in-the-blank' | 'speaking' | 'writing' | 'reading' | 'dialogue' | 'grammar' | 'vocab'
@@ -71,8 +72,9 @@ interface Lesson {
 
 export default function LessonPlayerPage({ params }: { params: { id: string } }) {
   const { id: lessonId } = params
-  const [lesson, setLesson] = useState<Lesson | null>(null)
-  const [loading, setLoading] = useState(true)
+  
+  // ✅ Goal 1 & 2: Client-Side SWR (Instant Navigation with fallback data)
+  const { data: lesson, error: lessonError, isLoading: loading } = useLesson(lessonId, undefined)
 
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
   const [ttsMode, setTtsMode] = useState<'ai' | 'local'>('local')
@@ -194,38 +196,21 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
       setIsThinking(false)
     }
   }
-
+// Initialize lesson data from SWR
+  // Initialize lesson data from SWR
   useEffect(() => {
-    const fetchLesson = async () => {
-      try {
-        console.log('📚 Fetching lesson:', lessonId)
-        const res = await fetch(`/api/lessons/${lessonId}`)
-        console.log('📡 Response status:', res.status)
-        if (!res.ok) throw new Error('Failed to load')
-        const data = await res.json()
-        console.log('✅ Lesson loaded:', data)
-
-        // IMPORTANT: Parse contentJson if it's a string
-        if (typeof data.contentJson === 'string') {
-          console.log('⚠️  Parsing stringified contentJson...')
-          data.contentJson = JSON.parse(data.contentJson)
-        }
-
-        setLesson(data)
-        const qCount = data.contentJson?.questions?.length || 0
-        console.log('❓ Questions count:', qCount)
-        console.log('🔍 First question type:', data.contentJson?.questions?.[0]?.type)
-        setTotalQuestions(qCount)
-        if (qCount === 0) setError('Matrix empty.')
-      } catch (err) {
-        console.error('❌ Error fetching lesson:', err)
-        setError('Uplink failed.')
-      } finally {
-        setLoading(false)
-      }
+    if (lesson) {
+      const qCount = lesson.contentJson?.questions?.length || 0
+      console.log('✅ Lesson loaded from SWR:', lesson.id)
+      console.log('❓ Questions count:', qCount)
+      setTotalQuestions(qCount)
+      if (qCount === 0) setError('Matrix empty.')
     }
-    fetchLesson()
-  }, [lessonId])
+    if (lessonError) {
+      console.error('❌ Error fetching lesson:', lessonError)
+      setError('Uplink failed.')
+    }
+  }, [lesson, lessonError])
 
   const currentQuestion = lesson?.contentJson?.questions?.[currentIndex]
 
@@ -293,7 +278,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
 
   if (loading) return <AILoader />
 
-  if (error || !lesson) return (
+  if (error || !lesson || !lesson.chapter) return (
     <div className="flex flex-col items-center justify-center h-screen bg-slate-50 dark:bg-[#030712] p-6 text-center">
       <AlertCircle size={48} className="text-rose-500 mb-4" />
       <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">System Error</h2>
@@ -303,7 +288,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
     </div>
   )
 
-  const currentLessonIdx = (lesson.chapter.lessons || []).findIndex(l => l.id === lessonId)
+  const currentLessonIdx = (lesson.chapter.lessons || []).findIndex((l: { id: string }) => l.id === lessonId)
   const nextLessonId = lesson.chapter.lessons?.[currentLessonIdx + 1]?.id
 
   return (

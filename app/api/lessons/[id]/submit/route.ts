@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { redis, cacheKeys } from '@/lib/cache/redis'
 
 const submitSchema = z.object({
   score: z.number().min(0).max(100),
@@ -21,7 +22,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: lessonId } = params
+    const { id: lessonId } = await params
     const body = await request.json()
     const { score, timeSpent } = submitSchema.parse(body)
 
@@ -159,6 +160,11 @@ export async function POST(
         xpEarned,
       }
     })
+
+    // Invalidate user progress cache
+    const progressCacheKey = cacheKeys.userProgress(authUser.id, langCode)
+    await redis.del(progressCacheKey)
+    console.log(`🗑️ Invalidated user progress cache: ${authUser.id}:${langCode}`)
 
     // 7. Check Chapter Completion & Advancement
     if (isPassed) {

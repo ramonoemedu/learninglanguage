@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, CheckCircle2, Lock, Sparkles, Target, Zap, BrainCircuit, Headphones, Mic2, FileText, Play, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useChapterLessons } from '@/lib/hooks/useLessons'
+import { mutate } from 'swr'
 
 interface Lesson {
   id: string
@@ -24,24 +26,18 @@ interface Chapter {
 
 export default function ChapterLessonsPage({ params }: { params: { langCode: string, id: string } }) {
   const { langCode, id: chapterId } = params
-  const [chapter, setChapter] = useState<Chapter | null>(null)
-  const [loading, setLoading] = useState(true)
   const router = useRouter()
+  
+  // ✅ Goal 1: Client-Side SWR (Instant Navigation)
+  const { data: chapter, error, isLoading: loading } = useChapterLessons(chapterId)
 
-  useEffect(() => {
-    const fetchLessons = async () => {
-      try {
-        const res = await fetch(`/api/chapters/${chapterId}/lessons`)
-        const data = await res.json()
-        setChapter(data)
-      } catch (err) {
-        console.error('Failed to load lessons', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchLessons()
-  }, [chapterId])
+  // ✅ Goal 2: Navigate with lesson pre-population
+  const handleLessonClick = (lesson: Lesson) => {
+    if (!lesson) return
+    // Pre-populate the lesson cache before navigating for instant loading
+    mutate(`/api/lessons/${lesson.id}`, lesson, false)
+    router.push(`/lesson/${lesson.id}`)
+  }
 
   const getLessonIcon = (type: string, status: 'locked' | 'active' | 'completed') => {
     const size = 22
@@ -69,6 +65,14 @@ export default function ChapterLessonsPage({ params }: { params: { langCode: str
     }
   }
 
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <span className="text-red-500">Failed to load lessons</span>
+      </div>
+    )
+  }
+
   if (loading || !chapter) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
@@ -79,7 +83,7 @@ export default function ChapterLessonsPage({ params }: { params: { langCode: str
   }
 
   const lessons = chapter.lessons || []
-  const activeIndex = lessons.findIndex(l => !l.completed)
+  const activeIndex = lessons.findIndex((l: Lesson) => !l.completed)
   const currentActiveIndex = activeIndex === -1 ? lessons.length : activeIndex
 
   return (
@@ -136,7 +140,7 @@ export default function ChapterLessonsPage({ params }: { params: { langCode: str
         </div>
 
         <div className="space-y-8 relative z-10">
-          {lessons.map((lesson, index) => {
+          {lessons.map((lesson: Lesson, index: number) => {
             const isCompleted = index < currentActiveIndex
             const isActive = index === currentActiveIndex
             const isLocked = index > currentActiveIndex
@@ -171,7 +175,7 @@ export default function ChapterLessonsPage({ params }: { params: { langCode: str
                 {/* MISSION CARD */}
                 <button
                   disabled={isLocked}
-                  onClick={() => !isLocked && router.push(`/lesson/${lesson.id}`)}
+                  onClick={() => !isLocked && handleLessonClick(lesson)}
                   className={`group flex-1 relative overflow-hidden rounded-[32px] border transition-all duration-300 text-left p-6 sm:p-8 ${
                     isActive 
                       ? 'bg-white/80 dark:bg-[#050b14]/80 backdrop-blur-3xl border-sky-500/30 shadow-xl shadow-sky-500/5 -translate-y-1' 

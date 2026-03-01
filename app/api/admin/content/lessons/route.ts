@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
+import { redis, cacheKeys, cacheTTL } from '@/lib/cache/redis'
+
+export const revalidate = 0 // Disable Next.js static caching
 
 export async function GET(request: Request) {
   try {
@@ -20,6 +23,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const cacheKey = cacheKeys.allLessons()
+
+    // 1. Check Redis cache
+    const cached = await redis.get(cacheKey)
+    if (cached) {
+      console.log('✅ Cache HIT for all lessons (admin)')
+      return NextResponse.json(cached)
+    }
+
+    console.log('❌ Cache MISS for all lessons (admin)')
+
+    // 2. Fetch from database
     const lessons = await prisma.lesson.findMany({
       include: {
         chapter: {
@@ -38,6 +53,10 @@ export async function GET(request: Request) {
         { chapter: { chapterNum: 'asc' } }
       ]
     })
+
+    // 3. Store in Redis
+    await redis.setex(cacheKey, cacheTTL.allLessons, lessons)
+    console.log('💾 Cached all lessons (admin)')
 
     return NextResponse.json(lessons)
   } catch (error) {
@@ -76,6 +95,13 @@ export async function POST(request: Request) {
         coinReward: Number(coinReward) || 5
       }
     })
+
+    // Invalidate relevant caches
+    await Promise.all([
+      redis.del(cacheKeys.allLessons()),
+      redis.del(cacheKeys.chapterLessons(chapterId)),
+    ])
+    console.log('🗑️  Invalidated caches after lesson creation')
 
     return NextResponse.json(lesson)
   } catch (error) {

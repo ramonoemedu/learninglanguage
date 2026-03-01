@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
+import { revalidateTag, revalidatePath } from 'next/cache'
+import { redis, cacheKeys } from '@/lib/cache/redis'
 
 export async function PATCH(
   request: Request,
@@ -23,11 +25,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const { chapterId, type, contentJson, xpReward, coinReward } = body
 
+    // Update in database
     const lesson = await prisma.lesson.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         chapterId,
         type,
@@ -36,6 +40,19 @@ export async function PATCH(
         coinReward: Number(coinReward)
       }
     })
+
+    // 🔴 CRITICAL: Cache invalidation
+    await Promise.all([
+      redis.del(cacheKeys.lesson(id)),
+      redis.del(cacheKeys.chapterLessons(chapterId)),
+      redis.del(cacheKeys.allLessons()),
+    ])
+    console.log(`🗑️  Invalidated caches for lesson: ${id}`)
+
+    // Revalidate Next.js cache
+    revalidatePath('/admin/content/lessons')
+    revalidatePath(`/lesson/${id}`)
+    revalidatePath(`/(dashboard)/learn/[langCode]/chapter/[id]`, 'page')
 
     return NextResponse.json(lesson)
   } catch (error) {
@@ -60,7 +77,31 @@ export async function DELETE(
 
     if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    await prisma.lesson.delete({ where: { id: params.id } })
+    const { id } = await params
+
+    // Get lesson details before deletion for cache invalidation
+    const lesson = await prisma.lesson.findUnique({
+      where: { id },
+      select: { chapterId: true }
+    })
+
+    await prisma.lesson.delete({ where: { id } })
+
+    // 🔴 CRITICAL: Cache invalidation
+    if (lesson) {
+      await Promise.all([
+        redis.del(cacheKeys.lesson(id)),
+        redis.del(cacheKeys.chapterLessons(lesson.chapterId)),
+        redis.del(cacheKeys.allLessons()),
+      ])
+      console.log(`🗑️  Invalidated caches after lesson deletion: ${id}`)
+    }
+
+    // Revalidate Next.js cache
+    revalidatePath('/admin/content/lessons')
+    revalidatePath(`/lesson/${id}`)
+    revalidatePath(`/(dashboard)/learn/[langCode]/chapter/[id]`, 'page')
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting lesson:', error)

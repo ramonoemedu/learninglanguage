@@ -14,9 +14,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!await checkAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
+    const { id } = await params
     const body = await request.json()
     const updated = await prisma.vocabulary.update({
-      where: { id: params.id },
+      where: { id },
       data: body
     })
     return NextResponse.json(updated)
@@ -29,7 +30,8 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   if (!await checkAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    await prisma.vocabulary.delete({ where: { id: params.id } })
+    const { id } = await params
+    await prisma.vocabulary.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 })

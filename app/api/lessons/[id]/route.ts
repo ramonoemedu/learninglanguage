@@ -2,6 +2,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
+import { redis, cacheKeys, cacheTTL } from '@/lib/cache/redis'
+
+export const revalidate = 0 // Disable Next.js static caching
 
 export async function GET(
   request: Request,
@@ -15,13 +18,27 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = params
+    const { id } = await params
+    const cacheKey = cacheKeys.lesson(id)
 
+    // 1. Check Redis cache first
+    const cached: any = await redis.get(cacheKey)
+    if (cached) {
+      console.log(`✅ Cache HIT for lesson: ${id}`)
+      return NextResponse.json(cached)
+    }
+
+    console.log(`❌ Cache MISS for lesson: ${id}`)
+
+    // 2. Fetch from database
     const lesson = await prisma.lesson.findUnique({
       where: { id },
       include: {
         chapter: {
           include: {
+            lessons: { 
+              select: { id: true }
+            },
             stage: {
               include: {
                 language: true
@@ -41,11 +58,17 @@ export async function GET(
     if (typeof contentJson === 'string') {
       contentJson = JSON.parse(contentJson as any)
     }
-    
-    return NextResponse.json({
+
+    const response = {
       ...lesson,
       contentJson
-    })
+    }
+
+    // 3. Store in Redis with expiration
+    await redis.setex(cacheKey, cacheTTL.lesson, response)
+    console.log(`💾 Cached lesson: ${id}`)
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Error fetching lesson:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
