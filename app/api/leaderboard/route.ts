@@ -10,6 +10,12 @@ const leaderboardQuerySchema = z.object({
 
 export async function GET(request: Request) {
   try {
+    // Check if Prisma is available
+    if (!prisma) {
+      console.error('Database not available')
+      return NextResponse.json({ error: 'Database connection unavailable' }, { status: 503 })
+    }
+
     const supabase = await createClient()
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 

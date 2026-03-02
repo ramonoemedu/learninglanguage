@@ -12,6 +12,12 @@ const registerSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // Check if Prisma is available
+    if (!prisma) {
+      console.error('Database not available')
+      return NextResponse.json({ error: 'Database connection unavailable' }, { status: 503 })
+    }
+
     const body = await request.json()
     const { email, password, name } = registerSchema.parse(body)
 

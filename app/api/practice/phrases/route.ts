@@ -4,6 +4,12 @@ import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
   try {
+    // Check if Prisma is available
+    if (!prisma) {
+      console.error('Database not available')
+      return NextResponse.json({ error: 'Database connection unavailable' }, { status: 503 })
+    }
+
     const { searchParams } = new URL(request.url)
     const level = searchParams.get('level')
     const lang = searchParams.get('lang') || 'zh'

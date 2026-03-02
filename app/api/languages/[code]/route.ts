@@ -11,6 +11,12 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   try {
+    // Check if Prisma is available
+    if (!prisma) {
+      console.error('Database not available')
+      return NextResponse.json({ error: 'Database connection unavailable' }, { status: 503 })
+    }
+
     const { code } = await params
     const cacheKey = cacheKeys.language(code)
 
