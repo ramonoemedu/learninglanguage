@@ -10,6 +10,9 @@ const checkAdmin = async () => {
   return dbUser?.role === 'admin' ? user : null
 }
 
+// Force dynamic rendering - don't run at build time
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   if (!await checkAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   

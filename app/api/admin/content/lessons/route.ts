@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { redis, cacheKeys, cacheTTL } from '@/lib/cache/redis'
 
 export const revalidate = 0 // Disable Next.js static caching
+export const dynamic = 'force-dynamic' // Don't run at build time
 
 export async function GET(request: Request) {
   try {

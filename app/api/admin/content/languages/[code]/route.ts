@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server'
 import { redis, cacheKeys } from '@/lib/cache/redis'
 import { revalidatePath } from 'next/cache'
 
+// Force dynamic rendering - don't run at build time
+export const dynamic = 'force-dynamic'
+
 export async function PATCH(
   request: Request,
   { params }: { params: { code: string } }

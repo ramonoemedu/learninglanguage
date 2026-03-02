@@ -10,6 +10,9 @@ const chapterSchema = z.object({
   title: z.string().min(1),
 })
 
+// Force dynamic rendering - don't run at build time
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const supabase = await createClient()
