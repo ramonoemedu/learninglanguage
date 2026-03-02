@@ -1,12 +1,15 @@
 // app/api/ai/generate-reading-passage/route.ts
-import { openai, OPENAI_CHAT_MODEL } from '@/lib/openai/client'
+// 🎉 NOW 100% FREE - Uses pre-written reading passage library
+// Cost: $0 (was ~$25/month)
+
 import { createClient } from '@/lib/supabase/server'
+import { getPassagesByStage, getPassagesByLanguage } from '@/lib/reading-passages'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const generateReadingSchema = z.object({
-  chapterId: z.string(),
   languageCode: z.string().length(2),
+  stageNumber: z.number().min(1).max(10).optional(),
 })
 
 export async function POST(request: Request) {
@@ -19,59 +22,39 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { chapterId, languageCode } = generateReadingSchema.parse(body)
+    const { languageCode, stageNumber } = generateReadingSchema.parse(body)
 
-    // In a real scenario, you'd fetch vocabulary for this chapter
-    // and provide it to the AI for context and to ensure level-appropriateness.
-    // For now, we'll use a generic prompt.
+    // 1. Get passages for the stage if provided
+    let passages = stageNumber
+      ? getPassagesByStage(languageCode, `stage${stageNumber}`)
+      : getPassagesByLanguage(languageCode)
 
-    const systemPrompt = `You are a helpful language teacher. Generate a short reading passage (100-150 words) in ${languageCode} about a simple daily life topic, suitable for a beginner. 
-    Make sure the vocabulary is simple and repetitive.
-    Then, generate 3 multiple-choice comprehension questions about the passage.
-    Your response should be a JSON object with the following structure:
-    {
-      "passage": "string",
-      "comprehensionQuestions": [
+    if (passages.length === 0) {
+      return NextResponse.json(
         {
-          "question": "string",
-          "options": ["string", "string", "string", "string"],
-          "correctAnswer": "string"
+          error: 'No passages available for this language/stage',
+          available:
+            stageNumber
+              ? `Try a different stage (1-10)`
+              : `No content for language: ${languageCode}`,
         },
-        // ... more questions
-      ]
-    }`
-
-    const chatCompletion = await openai.chat.completions.create({
-      model: OPENAI_CHAT_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Generate a reading passage and 3 comprehension questions for a beginner in ${languageCode} for a chapter on daily greetings.` },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 1000,
-      temperature: 0.7, // Allow some creativity
-    })
-
-    const responseContent = chatCompletion.choices[0]?.message?.content
-    if (!responseContent) {
-      throw new Error('No content received from AI')
+        { status: 404 }
+      )
     }
 
-    const aiGeneratedContent = JSON.parse(responseContent)
-    // Basic validation of AI response structure
-    const contentSchema = z.object({
-      passage: z.string(),
-      comprehensionQuestions: z.array(z.object({
-        question: z.string(),
-        options: z.array(z.string()).length(4),
-        correctAnswer: z.string(),
-      })).min(1),
-    })
-    const validatedContent = contentSchema.parse(aiGeneratedContent)
+    // 2. Return random passage from available
+    const randomPassage = passages[Math.floor(Math.random() * passages.length)]
 
-    return NextResponse.json(validatedContent)
+    return NextResponse.json({
+      passage: randomPassage.passage,
+      title: randomPassage.title,
+      difficulty: randomPassage.difficulty,
+      wordCount: randomPassage.wordCount,
+      vocabularyWords: randomPassage.vocabularyWords,
+      comprehensionQuestions: randomPassage.comprehensionQuestions,
+    })
   } catch (error) {
-    console.error('Error generating reading passage:', error)
+    console.error('Error fetching reading passage:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 })
     }

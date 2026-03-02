@@ -61,6 +61,7 @@ interface Lesson {
     chapterNum: number
     lessons: { id: string }[]
     stage: {
+      stageNumber: number
       language: {
         name: string
         flag: string
@@ -72,7 +73,7 @@ interface Lesson {
 
 export default function LessonPlayerPage({ params }: { params: { id: string } }) {
   const { id: lessonId } = params
-  
+
   // ✅ Goal 1 & 2: Client-Side SWR (Instant Navigation with fallback data)
   const { data: lesson, error: lessonError, isLoading: loading } = useLesson(lessonId, undefined)
 
@@ -196,7 +197,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
       setIsThinking(false)
     }
   }
-// Initialize lesson data from SWR
+  // Initialize lesson data from SWR
   // Initialize lesson data from SWR
   useEffect(() => {
     if (lesson) {
@@ -220,7 +221,64 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
 
   const handleCheck = async () => {
     if (!currentQuestion || status !== 'playing') return
-    let isCorrect = selectedAnswer?.toLowerCase().trim() === currentQuestion.correctAnswer?.toLowerCase().trim()
+
+    // For writing questions, use the validator API
+    if (currentQuestion.type === 'writing') {
+      setIsSubmitting(true)
+      try {
+        const res = await fetch('/api/ai/grade-writing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userText: selectedAnswer,
+            correctAnswer: currentQuestion.word || currentQuestion.correctAnswer,
+            stageNumber: lesson?.chapter.stage.stageNumber || 1,
+            languageCode: lesson?.chapter.stage.language.code || 'en',
+          }),
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to grade writing.')
+        }
+
+        // Consider it correct if score >= 80
+        const isCorrect = data.score >= 80
+
+        if (isCorrect) {
+          setCorrectAnswersCount(prev => prev + 1)
+          setCombo(prev => prev + 1)
+          setStatus('correct')
+        } else {
+          const newHearts = Math.max(0, hearts - 1)
+          setHearts(newHearts)
+          setCombo(0)
+          setCorrectAnswerText(currentQuestion.correctAnswer || 'Error')
+          setStatus('wrong')
+          if (newHearts <= 0) { setStatus('failed'); onOpen() }
+        }
+      } catch (err) {
+        console.error('Error grading writing:', err)
+        setError('Failed to grade your answer')
+        setStatus('wrong')
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
+    }
+
+    // For speaking questions, use similarity/includes logic (matching API behavior)
+    let isCorrect: boolean
+    if (currentQuestion.type === 'speaking') {
+      const transcribed = selectedAnswer?.toLowerCase().trim() || ''
+      const target = currentQuestion.correctAnswer?.toLowerCase().trim() || ''
+      // Match the API's includes logic
+      isCorrect = transcribed.includes(target) || target.includes(transcribed)
+    } else {
+      // For other question types, use exact match
+      isCorrect = selectedAnswer?.toLowerCase().trim() === currentQuestion.correctAnswer?.toLowerCase().trim()
+    }
 
     if (isCorrect) {
       setCorrectAnswersCount(prev => prev + 1)
@@ -316,7 +374,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
                   )}
                 </AnimatePresence>
               </div>
-              <Progress value={((currentIndex + (status !== 'playing' ? 1 : 0)) / totalQuestions) * 100} size="sm" color="primary" />
+              <Progress value={((currentIndex + (status !== 'playing' ? 1 : 0)) / totalQuestions) * 100} size="sm" color="primary" aria-label="Lesson progress" />
             </div>
 
             {/* SPEED CONTROLS */}
@@ -389,7 +447,7 @@ export default function LessonPlayerPage({ params }: { params: { id: string } })
               {currentQuestion.type === 'grammar' && <MultipleChoice question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'listen' && <Listening question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} showOptions={true} playbackSpeed={playbackSpeed} playTTS={playTTS} />}
               {currentQuestion.type === 'speaking' && <Speaking question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} playTTS={playTTS} />}
-              {currentQuestion.type === 'writing' && <Writing question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} />}
+              {currentQuestion.type === 'writing' && <Writing question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} stageNumber={lesson.chapter.stage.stageNumber} languageCode={lesson.chapter.stage.language.code} />}
               {currentQuestion.type === 'reading' && <Reading question={currentQuestion as any} onAnswer={handleAnswer} selectedAnswer={selectedAnswer} disabled={status !== 'playing'} />}
               {currentQuestion.type === 'dialogue' && <Dialogue question={currentQuestion as any} onAnswer={handleAnswer} disabled={status !== 'playing'} />}
 

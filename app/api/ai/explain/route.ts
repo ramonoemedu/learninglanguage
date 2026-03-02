@@ -1,13 +1,15 @@
 // app/api/ai/explain/route.ts
-import { openai, OPENAI_CHAT_MODEL } from '@/lib/openai/client'
+// 🎉 NOW 100% FREE - Uses pre-written grammar library
+// Cost: $0 (was ~$20/month)
+
 import { createClient } from '@/lib/supabase/server'
+import { getGrammarTopic, getGrammarByLanguage } from '@/lib/grammar-guide'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const explainSchema = z.object({
-  topic: z.string().min(1), // e.g., "Chinese tones", "Past tense in Khmer"
+  topicId: z.string().min(1), // Grammar topic ID
   targetLanguage: z.string().length(2),
-  nativeLanguage: z.string().length(2),
 })
 
 export async function GET(request: Request) {
@@ -20,42 +22,46 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const topic = searchParams.get('topic')
+    const topicId = searchParams.get('topicId')
     const targetLanguage = searchParams.get('targetLanguage')
-    const nativeLanguage = searchParams.get('nativeLanguage')
 
-    const { topic: validatedTopic, targetLanguage: validatedTargetLanguage, nativeLanguage: validatedNativeLanguage } = explainSchema.parse({ topic, targetLanguage, nativeLanguage })
-
-    // Check if explanation exists in cache (Prisma grammar_explanations table)
-    // For now, we skip caching and generate directly.
-
-    const systemPrompt = `You are an expert language teacher specializing in ${validatedTargetLanguage}.
-    You are asked to explain a grammar topic to a learner whose native language is ${validatedNativeLanguage}.
-    Provide a clear, concise explanation of the topic.
-    Include 2-3 simple example sentences in ${validatedTargetLanguage} with their ${validatedNativeLanguage} translations.
-    If applicable, briefly compare or contrast it with how it works in ${validatedNativeLanguage}.
-    Keep the explanation easy to understand for a language learner.`
-
-    const chatCompletion = await openai.chat.completions.create({
-      model: OPENAI_CHAT_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Explain "${validatedTopic}" in ${validatedTargetLanguage} for a ${validatedNativeLanguage} speaker.` },
-      ],
-      max_tokens: 500,
-      temperature: 0.5,
+    const { topicId: validatedTopicId, targetLanguage: validatedTargetLanguage } = explainSchema.parse({
+      topicId,
+      targetLanguage,
     })
 
-    const explanation = chatCompletion.choices[0]?.message?.content
-    if (!explanation) {
-      throw new Error('No explanation received from AI')
+    // 1. Try to get specific grammar topic by ID
+    let grammarTopic = getGrammarTopic(validatedTopicId)
+
+    // 2. If not found, return available topics for the language
+    if (!grammarTopic) {
+      const topicsForLanguage = getGrammarByLanguage(validatedTargetLanguage)
+      if (topicsForLanguage.length === 0) {
+        return NextResponse.json(
+          { error: 'No grammar topics available for this language' },
+          { status: 404 }
+        )
+      }
+      return NextResponse.json({
+        error: 'Topic not found. Available topics:',
+        availableTopics: topicsForLanguage.map(t => ({
+          id: t.id,
+          title: t.title,
+          difficulty: t.difficulty,
+        })),
+      })
     }
 
-    // In a real scenario, you would save this to the grammar_explanations table for caching.
-
-    return NextResponse.json({ explanation })
+    return NextResponse.json({
+      id: grammarTopic.id,
+      title: grammarTopic.title,
+      difficulty: grammarTopic.difficulty,
+      content: grammarTopic.content,
+      examples: grammarTopic.examples,
+      tips: grammarTopic.tips,
+    })
   } catch (error) {
-    console.error('Error generating grammar explanation:', error)
+    console.error('Error fetching grammar explanation:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 })
     }

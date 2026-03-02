@@ -1,15 +1,17 @@
 // app/api/ai/grade-writing/route.ts
-import { openai, OPENAI_CHAT_MODEL } from '@/lib/openai/client'
-import { createClient } from '@/lib/supabase/server'
+// 🎉 NOW 100% FREE - Uses rule-based validation instead of GPT-4o-mini
+// Cost: $0 (was $0.0005/request)
+
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { validateWriting } from '@/lib/writing-validator'
 import { z } from 'zod'
 
 const gradeWritingSchema = z.object({
   userText: z.string().min(1),
-  prompt: z.string().min(1),
-  targetLanguage: z.string().length(2),
-  nativeLanguage: z.string().length(2),
-  correctAnswer: z.string().optional(), // For translation tasks
+  correctAnswer: z.string().min(1),
+  stageNumber: z.number().min(1).max(10).optional(),
+  languageCode: z.string().min(2).max(2).optional(),
 })
 
 export async function POST(request: Request) {
@@ -22,60 +24,21 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { userText, prompt, targetLanguage, nativeLanguage, correctAnswer } = gradeWritingSchema.parse(body)
+    const { 
+      userText, 
+      correctAnswer, 
+      stageNumber = 1, 
+      languageCode = 'en' 
+    } = gradeWritingSchema.parse(body)
 
-    const systemPrompt = `You are an Expert Neural Language Instructor specializing in ${targetLanguage} linguistic analysis.
-    Your mission is to evaluate a writing sequence from a learner whose native language is ${nativeLanguage}.
+    // ✅ USE FREE VALIDATION (no OpenAI API call!)
+    const result = validateWriting(userText, correctAnswer, stageNumber, languageCode)
 
-    [PROTOCOL: EVALUATION PARAMETERS]
-    - Prompt Context: "${prompt}"
-    - User Input: "${userText}"
-    ${correctAnswer ? `- Reference Standard (Optimal Matrix): "${correctAnswer}"` : ''}
-
-    [INSTRUCTIONS]
-    1. ANALYZE grammar, syntax, and lexical choice.
-    2. COMPARE user input against the Optimal Matrix (if provided) or native-level proficiency.
-    3. CALCULATE a proficiency score (0-100) based on accuracy and naturalness.
-    4. GENERATE a Corrected Sequence that preserves the user's intent but matches native fluency.
-    5. PROVIDE structured feedback in a concise, technical, yet encouraging HUD-style tone.
-
-    [OUTPUT FORMAT: JSON ONLY]
-    {
-      "score": number,
-      "feedback": "Concise analysis of errors and linguistic improvements.",
-      "correctedText": "The optimized version of the user's text."
-    }
-    `
-
-    const chatCompletion = await openai.chat.completions.create({
-      model: OPENAI_CHAT_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Please grade the following text based on the prompt.
-Prompt: "${prompt}"
-User's text: "${userText}"` },
-      ],
-      response_format: { type: "json_object" }, // Ensure JSON output
-      max_tokens: 500,
-      temperature: 0.2, // Keep responses consistent
+    return NextResponse.json({
+      score: result.score,
+      feedback: result.feedback,
+      correctedText: result.correctedText,
     })
-
-    const responseContent = chatCompletion.choices[0]?.message?.content
-    if (!responseContent) {
-      throw new Error('No content received from AI')
-    }
-
-    const aiFeedback = JSON.parse(responseContent) // Parse the JSON response
-    
-    // Validate AI response structure
-    const feedbackSchema = z.object({
-      score: z.number().min(0).max(100),
-      feedback: z.string(),
-      correctedText: z.string(),
-    })
-    const validatedFeedback = feedbackSchema.parse(aiFeedback)
-
-    return NextResponse.json(validatedFeedback)
   } catch (error) {
     console.error('Error grading writing:', error)
     if (error instanceof z.ZodError) {

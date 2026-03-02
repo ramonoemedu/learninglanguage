@@ -1,10 +1,12 @@
 // components/lesson/Speaking.tsx
+// 🎉 100% FREE - Uses Web Speech API (no OpenAI costs!)
 'use client'
 
 import { Button, Card, CardBody, Progress, Spinner } from '@heroui/react'
 import { Mic, Square, CheckCircle2, AlertCircle, Volume2, Sparkles, Activity, Headphones, Play } from 'lucide-react'
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { validateSpeaking } from '@/lib/writing-validator'
 
 interface SpeakingProps {
   question: {
@@ -23,13 +25,12 @@ interface SpeakingProps {
 
 export default function Speaking({ question, onAnswer, disabled, playTTS }: SpeakingProps) {
   const [recording, setRecording] = useState(false)
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
-  const [feedback, setFeedback] = useState<{ score: number, transcript: string, feedback: string } | null>(null)
+  const [transcript, setTranscript] = useState('')
+  const [feedback, setFeedback] = useState<{ score: number, transcript: string, feedback: string, isCorrect: boolean } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [isPlayingNative, setIsPlayingNative] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const recognitionRef = useRef<any>(null)
 
   const playNativeAudio = async () => {
     if (isPlayingNative) return
@@ -43,62 +44,103 @@ export default function Speaking({ question, onAnswer, disabled, playTTS }: Spea
     }
   }
 
-  const startRecording = async () => {
+  const startListening = () => {
     setFeedback(null)
     setError('')
+    setTranscript('')
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
-      const audioChunks: BlobPart[] = []
-
-      recorder.ondataavailable = (event) => {
-        audioChunks.push(event.data)
+      // Check browser support
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
+      if (!SpeechRecognition) {
+        setError('Speech Recognition not supported. Try Chrome, Edge, or Safari.')
+        return
       }
 
-      recorder.onstop = async () => {
-        const blob = new Blob(audioChunks, { type: 'audio/webm; codecs=opus' })
-        setAudioBlob(blob)
-        setLoading(true)
+      const recognition = new SpeechRecognition()
+
+      // Language mapping
+      const langMap: { [key: string]: string } = {
+        'zh': 'zh-CN',
+        'en': 'en-US',
+        'km': 'km-KH',
+      }
+
+      recognition.lang = langMap[question.languageCode] || 'en-US'
+      recognition.continuous = false
+      recognition.interimResults = true
+
+      recognition.onstart = () => {
+        setRecording(true)
+      }
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = ''
+        let interimTranscript = ''
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript
+
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript
+          } else {
+            interimTranscript += transcript
+          }
+        }
+
+        if (finalTranscript) {
+          setTranscript(finalTranscript)
+        }
+      }
+
+      recognition.onend = () => {
         setRecording(false)
-        await sendAudioForPronunciation(blob)
       }
 
-      recorder.start()
-      setRecording(true)
-      setMediaRecorder(recorder)
+      recognition.onerror = (error: any) => {
+        setRecording(false)
+        setError(`Mic error: ${error.error}. Try again?`)
+      }
+
+      recognitionRef.current = recognition
+      recognition.start()
     } catch (err) {
-      setError('Neural sensor blocked. Check mic permissions.')
+      setError('Microphone access denied. Check browser permissions.')
     }
   }
 
   const stopRecording = () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop()
-      mediaRecorder.stream.getTracks().forEach(track => track.stop())
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
     }
   }
 
-  const sendAudioForPronunciation = async (blob: Blob) => {
-    setLoading(true)
-    setError('')
-    try {
-      const formData = new FormData()
-      formData.append('audio', blob, 'recording.webm')
-      formData.append('targetText', question.word || question.correctAnswer)
-      formData.append('language', question.languageCode)
-
-      const res = await fetch('/api/ai/pronounce', { method: 'POST', body: formData })
-      const data = await res.json()
-
-      if (!res.ok) throw new Error(data.error || 'Signal analysis failed.')
-      setFeedback(data)
-      onAnswer(data.transcript)
-    } catch (err: any) {
-      setError(err.message)
-      setFeedback(null)
-    } finally {
-      setLoading(false)
+  // ✅ FREE VALIDATION - No API call needed!
+  const validateAnswer = () => {
+    if (!transcript) {
+      setError('No speech detected. Try again.')
+      return
     }
+
+    setLoading(true)
+
+    // Use FREE validator
+    const result = validateSpeaking(
+      transcript,
+      question.word || question.correctAnswer
+    )
+
+    // Show feedback
+    setFeedback({
+      score: result.score,
+      transcript: transcript,
+      feedback: result.feedback,
+      isCorrect: result.isCorrect
+    })
+
+    // Send to parent
+    onAnswer(transcript)
+    setLoading(false)
   }
 
   return (
@@ -113,26 +155,20 @@ export default function Speaking({ question, onAnswer, disabled, playTTS }: Spea
       <Card className="w-full max-w-lg bg-white/70 dark:bg-[#050b14]/70 backdrop-blur-3xl border border-slate-200 dark:border-slate-800 shadow-2xl rounded-[40px] overflow-hidden">
         <CardBody className="flex flex-col items-center justify-center p-10 sm:p-16">
 
-          <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em] mb-8">{question.prompt || "Speak the sentence"}</h2>
+          <h2 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.3em] mb-8">{question.prompt || "Speak the phrase"}</h2>
+
           <motion.p
             animate={{ scale: isPlayingNative ? 1.05 : 1 }}
-            className="text-sky-500 dark:text-sky-400 text-3xl sm:text-4xl font-black mb-4 tracking-tight"
+            className="text-sky-500 dark:text-sky-400 text-2xl sm:text-3xl font-black mb-2 tracking-tight"
           >
-            {question.pinyin || question.correctAnswer}
-          </motion.p>
-          {/* 1. PRONUNCIATION HIERARCHY */}
-          <motion.p
-            animate={{ scale: isPlayingNative ? 1.05 : 1 }}
-            className="text-sky-500 dark:text-sky-400 text-3xl sm:text-4xl font-black mb-4 tracking-tight"
-          >
-            {question.pinyin || question.romanization}
+            {question.pinyin || question.romanization || ''}
           </motion.p>
 
           <span className="text-6xl sm:text-7xl font-black text-slate-900 dark:text-white mb-12">
             {question.word || question.correctAnswer}
           </span>
 
-          {/* 2. THE SHADOWING CONSOLE */}
+          {/* Controls */}
           <div className="flex items-center gap-8">
             <div className="flex flex-col items-center gap-2">
               <button
@@ -158,7 +194,7 @@ export default function Speaking({ question, onAnswer, disabled, playTTS }: Spea
                 </button>
               ) : (
                 <button
-                  onClick={startRecording}
+                  onClick={startListening}
                   disabled={loading || disabled}
                   className="w-20 h-20 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-[0_0_30px_rgba(56,189,248,0.4)] hover:shadow-[0_0_40px_rgba(56,189,248,0.6)] hover:-translate-y-1 transition-all disabled:opacity-50"
                 >
@@ -166,10 +202,29 @@ export default function Speaking({ question, onAnswer, disabled, playTTS }: Spea
                 </button>
               )}
               <span className="text-[9px] font-black text-sky-500 uppercase tracking-widest mt-1">
-                {recording ? 'Stop' : loading ? 'Analyzing...' : 'Speak Now'}
+                {recording ? 'Listening...' : loading ? 'Checking...' : 'Speak Now'}
               </span>
             </div>
           </div>
+
+          {/* Transcript Display */}
+          {transcript && !feedback && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 p-4 rounded-xl bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-800 w-full"
+            >
+              <p className="text-xs font-bold text-blue-700 dark:text-blue-400 mb-2">You said:</p>
+              <p className="text-lg font-medium text-slate-900 dark:text-white">"{transcript}"</p>
+              <button
+                onClick={validateAnswer}
+                disabled={loading}
+                className="mt-3 w-full px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg transition-all disabled:opacity-50"
+              >
+                {loading ? 'Checking...' : 'Check Answer'}
+              </button>
+            </motion.div>
+          )}
 
           {error && (
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs font-bold text-rose-500 mt-8 uppercase tracking-widest flex items-center gap-2">
@@ -179,7 +234,7 @@ export default function Speaking({ question, onAnswer, disabled, playTTS }: Spea
         </CardBody>
       </Card>
 
-      {/* 3. INTELLIGENT FEEDBACK */}
+      {/* Feedback */}
       <AnimatePresence>
         {feedback && (
           <motion.div
@@ -188,20 +243,20 @@ export default function Speaking({ question, onAnswer, disabled, playTTS }: Spea
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${feedback.score >= 70 ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
-                  {feedback.score >= 70 ? <CheckCircle2 className="text-emerald-500" size={18} /> : <Activity className="text-amber-500" size={18} />}
+                <div className={`p-2 rounded-lg ${feedback.isCorrect ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+                  {feedback.isCorrect ? <CheckCircle2 className="text-emerald-500" size={18} /> : <AlertCircle className="text-amber-500" size={18} />}
                 </div>
-                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Signal Analysis</h3>
+                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Analysis</h3>
               </div>
-              <span className={`text-2xl font-black ${feedback.score >= 70 ? 'text-emerald-500' : 'text-amber-500'}`}>{feedback.score}%</span>
+              <span className={`text-2xl font-black ${feedback.isCorrect ? 'text-emerald-500' : 'text-amber-500'}`}>{feedback.score}%</span>
             </div>
 
             <div className="space-y-3">
               <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Decoded Input</span>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">You said</span>
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300">"{feedback.transcript}"</p>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed italic">{feedback.feedback}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{feedback.feedback}</p>
             </div>
           </motion.div>
         )}

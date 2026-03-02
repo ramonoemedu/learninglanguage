@@ -280,7 +280,7 @@ export default function SpeechLabPage() {
                           <span className="text-3xl font-black">{score}%</span>
                         </div>
                       </div>
-                      <Progress value={score} color={score >= 70 ? 'success' : 'warning'} className="h-2.5" />
+                      <Progress value={score} color={score >= 70 ? 'success' : 'warning'} className="h-2.5" aria-label={`Accuracy score: ${score}%`} />
                     </div>
                     <div className="text-left space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
                       <div>

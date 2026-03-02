@@ -3,8 +3,9 @@
 
 import { Button, Textarea, Card, CardBody, Spinner } from '@heroui/react'
 import { useState } from 'react'
-import { CheckCircle2, AlertCircle, Sparkles, BrainCircuit, Terminal, Activity, Zap, ChevronRight } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Sparkles, BrainCircuit, Terminal, Activity, Zap, ChevronRight, Lightbulb } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { pinyinToCharacters } from '@/lib/utils/pinyin-converter'
 
 interface WritingProps {
   question: {
@@ -17,13 +18,22 @@ interface WritingProps {
   }
   onAnswer: (answer: string, score?: number) => void
   disabled?: boolean
+  stageNumber?: number
+  languageCode?: string
 }
 
-export default function Writing({ question, onAnswer, disabled }: WritingProps) {
+export default function Writing({ question, onAnswer, disabled, stageNumber = 1, languageCode = 'en' }: WritingProps) {
   const [userText, setUserText] = useState('')
   const [loading, setLoading] = useState(false)
   const [aiFeedback, setAiFeedback] = useState<{ score: number, feedback: string, correctedText: string } | null>(null)
   const [error, setError] = useState('')
+  const [showHint, setShowHint] = useState(false)
+  const [hintText, setHintText] = useState('')
+
+  // Determine difficulty based on stage
+  const isChineseLearning = languageCode === 'zh'
+  const requireCharacters = isChineseLearning && stageNumber >= 4 // Stages 4+ require Chinese characters
+  const acceptPinyin = isChineseLearning && stageNumber <= 5 // Stages 1-5 accept pinyin as backup
 
   const handleGradeWriting = async () => {
     setLoading(true)
@@ -34,10 +44,9 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userText,
-          prompt: question.prompt,
-          targetLanguage: question.targetLanguage,
-          nativeLanguage: question.nativeLanguage,
           correctAnswer: question.word || question.correctAnswer,
+          stageNumber,
+          languageCode,
         }),
       })
 
@@ -55,6 +64,22 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
       setAiFeedback(null)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleShowHint = () => {
+    if (!showHint && isChineseLearning) {
+      const target = question.word || question.correctAnswer
+      const hint = pinyinToCharacters(target)
+      if (hint) {
+        setHintText(hint)
+        setShowHint(true)
+      } else {
+        setHintText(target) // Fallback to showing the target
+        setShowHint(true)
+      }
+    } else {
+      setShowHint(!showHint)
     }
   }
 
@@ -77,9 +102,19 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
           </span>
           <div className="w-[1px] h-3 bg-slate-200 dark:bg-slate-800" />
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-            <Activity size={10} /> Linguistic Sync
+            <Activity size={10} /> {requireCharacters ? 'Characters Required' : 'Linguistic Sync'}
           </span>
         </div>
+        {isChineseLearning && stageNumber <= 3 && (
+          <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-3 font-medium">
+            ✓ Pinyin or characters accepted
+          </div>
+        )}
+        {requireCharacters && (
+          <div className="text-xs text-amber-600 dark:text-amber-400 mt-3 font-medium">
+            🎯 Write in Chinese characters for full points
+          </div>
+        )}
       </div>
 
       <div className="w-full max-w-4xl space-y-10 px-2 sm:px-0">
@@ -92,7 +127,8 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
                 onAnswer(val)
               }}
               placeholder={
-                question.targetLanguage === 'zh' ? "Type in Chinese... (e.g. 你好, 谢谢)" :
+                question.targetLanguage === 'zh' ?
+                  (stageNumber <= 3 ? "Type in Chinese or pinyin... (e.g. 你好 or nǐ hǎo)" : "Type in Chinese characters... (e.g. 你好)") :
                   question.targetLanguage === 'km' ? "Type in Khmer... (e.g. សួស្តី)" :
                     "Type in English... (e.g. dog, cat, weather)"
               }
@@ -114,6 +150,35 @@ export default function Writing({ question, onAnswer, disabled }: WritingProps) 
               <Activity size={16} className="text-sky-500 animate-pulse" />
             </div>
           </div>
+
+          {/* Hint Button for Chinese */}
+          {isChineseLearning && stageNumber <= 5 && !aiFeedback && (
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={handleShowHint}
+              disabled={disabled || loading}
+              className="absolute top-6 left-6 sm:top-10 sm:left-12 flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50"
+            >
+              <Lightbulb size={14} />
+              {showHint ? 'Hide' : 'Hint'}
+            </motion.button>
+          )}
+
+          {/* Hint Display */}
+          <AnimatePresence>
+            {showHint && hintText && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mt-4 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30"
+              >
+                <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest block mb-2">Character Hint</span>
+                <p className="text-2xl font-black text-slate-900 dark:text-white">{hintText}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {error && (

@@ -89,10 +89,11 @@ export default function OnboardingPage() {
               {progressValue}% Complete
             </div>
           </div>
-          <Progress 
-            value={progressValue} 
-            className="h-2" 
+          <Progress
+            value={progressValue}
+            className="h-2"
             color="primary"
+            aria-label={`Profile setup progress: ${progressValue}%`}
             classNames={{
               indicator: "bg-gradient-to-r from-primary to-primary-400"
             }}
@@ -116,8 +117,8 @@ export default function OnboardingPage() {
                   {step === 1 ? 'What is your native language?' : 'What language do you want to learn?'}
                 </h2>
                 <p className="text-default-500">
-                  {step === 1 
-                    ? 'Select the language you are most comfortable with.' 
+                  {step === 1
+                    ? 'Select the language you are most comfortable with.'
                     : 'Choose your first target language. You can add more later.'}
                 </p>
               </CardHeader>
@@ -126,16 +127,15 @@ export default function OnboardingPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {(step === 1 ? languages : languages.filter(l => l.code !== nativeLang)).map(lang => {
                     const isSelected = (step === 1 && nativeLang === lang.code) || (step === 2 && targetLang === lang.code)
-                    
+
                     return (
-                      <Card 
+                      <Card
                         key={lang.code}
                         isPressable
-                        className={`relative overflow-hidden p-6 flex flex-row items-center gap-4 border-2 transition-all duration-200 group ${
-                          isSelected 
-                            ? 'border-primary bg-primary-50 dark:bg-primary-900/20' 
+                        className={`relative overflow-hidden p-6 flex flex-row items-center gap-4 border-2 transition-all duration-200 group ${isSelected
+                            ? 'border-primary bg-primary-50 dark:bg-primary-900/20'
                             : 'border-default-100 bg-white dark:bg-zinc-800 hover:border-primary-200'
-                        }`}
+                          }`}
                         onClick={() => {
                           if (step === 1) {
                             setNativeLang(lang.code)
@@ -161,8 +161,8 @@ export default function OnboardingPage() {
 
                 <div className="flex justify-between mt-12 gap-4">
                   {step === 2 ? (
-                    <Button 
-                      variant="light" 
+                    <Button
+                      variant="light"
                       startContent={<ChevronLeft size={20} />}
                       onClick={() => { setStep(1); setTargetLang(''); }}
                       className="font-medium"
@@ -170,7 +170,7 @@ export default function OnboardingPage() {
                       Back
                     </Button>
                   ) : <div />}
-                  
+
                   {step === 1 ? (
                     <Button
                       color="primary"
@@ -197,7 +197,7 @@ export default function OnboardingPage() {
             </Card>
           </motion.div>
         </AnimatePresence>
-        
+
         <p className="text-center mt-8 text-sm text-default-400">
           Join 10,000+ students learning daily
         </p>
