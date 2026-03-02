@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
 
+// Force dynamic rendering - don't run at build time
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
