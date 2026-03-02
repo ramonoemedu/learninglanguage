@@ -45,12 +45,14 @@ export async function PATCH(
     })
 
     // 🔴 CRITICAL: Cache invalidation
-    await Promise.all([
-      redis.del(cacheKeys.lesson(id)),
-      redis.del(cacheKeys.chapterLessons(chapterId)),
-      redis.del(cacheKeys.allLessons()),
-    ])
-    console.log(`🗑️  Invalidated caches for lesson: ${id}`)
+    if (redis) {
+      await Promise.all([
+        redis.del(cacheKeys.lesson(id)),
+        redis.del(cacheKeys.chapterLessons(chapterId)),
+        redis.del(cacheKeys.allLessons()),
+      ])
+      console.log(`🗑️  Invalidated caches for lesson: ${id}`)
+    }
 
     // Revalidate Next.js cache
     revalidatePath('/admin/content/lessons')
@@ -91,7 +93,7 @@ export async function DELETE(
     await prisma.lesson.delete({ where: { id } })
 
     // 🔴 CRITICAL: Cache invalidation
-    if (lesson) {
+    if (lesson && redis) {
       await Promise.all([
         redis.del(cacheKeys.lesson(id)),
         redis.del(cacheKeys.chapterLessons(lesson.chapterId)),

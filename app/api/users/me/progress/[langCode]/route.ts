@@ -23,7 +23,7 @@ export async function GET(
     const cacheKey = cacheKeys.userProgress(user.id, langCode)
 
     // Check Redis cache first
-    const cached = await redis.get(cacheKey)
+    const cached = redis ? await redis.get(cacheKey) : null
     if (cached) {
       console.log(`✅ Cache HIT for user progress: ${user.id}:${langCode}`)
       return NextResponse.json(cached)
@@ -56,7 +56,7 @@ export async function GET(
     }
 
     // Cache the result
-    await redis.setex(cacheKey, cacheTTL.userProgress, response)
+    if (redis) await redis.setex(cacheKey, cacheTTL.userProgress, response)
     console.log(`💾 Cached user progress: ${user.id}:${langCode}`)
 
     return NextResponse.json(response)

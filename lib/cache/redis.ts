@@ -1,13 +1,13 @@
 import { Redis } from '@upstash/redis'
 
-if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-  throw new Error('Missing Upstash Redis environment variables')
-}
-
-export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-})
+// Only instantiate Redis if environment variables are available (runtime, not build time)
+export const redis =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    ? new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      })
+    : undefined
 
 // Cache key generators
 export const cacheKeys = {

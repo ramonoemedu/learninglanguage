@@ -23,7 +23,7 @@ export async function GET(
     const cacheKey = cacheKeys.chapterLessons(chapterId)
 
     // 1. Check Redis cache first (excluding user-specific completion data)
-    const cached = await redis.get(cacheKey)
+    const cached = redis ? await redis.get(cacheKey) : null
     
     // 2. Always fetch user progress (user-specific, not cacheable globally)
     const completedLessons = await prisma.userProgress.findMany({
@@ -59,7 +59,7 @@ export async function GET(
     }
 
     // 4. Store base chapter data in Redis (without user-specific completion)
-    await redis.setex(cacheKey, cacheTTL.chapterLessons, chapter)
+    if (redis) await redis.setex(cacheKey, cacheTTL.chapterLessons, chapter)
     console.log(`💾 Cached chapter lessons: ${chapterId}`)
 
     // 5. Merge with user progress

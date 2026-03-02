@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const cacheKey = cacheKeys.allLessons()
 
     // 1. Check Redis cache
-    const cached = await redis.get(cacheKey)
+    const cached = redis ? await redis.get(cacheKey) : null
     if (cached) {
       console.log('✅ Cache HIT for all lessons (admin)')
       return NextResponse.json(cached)
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     })
 
     // 3. Store in Redis
-    await redis.setex(cacheKey, cacheTTL.allLessons, lessons)
+    if (redis) await redis.setex(cacheKey, cacheTTL.allLessons, lessons)
     console.log('💾 Cached all lessons (admin)')
 
     return NextResponse.json(lessons)
@@ -98,11 +98,13 @@ export async function POST(request: Request) {
     })
 
     // Invalidate relevant caches
-    await Promise.all([
-      redis.del(cacheKeys.allLessons()),
-      redis.del(cacheKeys.chapterLessons(chapterId)),
-    ])
-    console.log('🗑️  Invalidated caches after lesson creation')
+    if (redis) {
+      await Promise.all([
+        redis.del(cacheKeys.allLessons()),
+        redis.del(cacheKeys.chapterLessons(chapterId)),
+      ])
+      console.log('🗑️  Invalidated caches after lesson creation')
+    }
 
     return NextResponse.json(lesson)
   } catch (error) {

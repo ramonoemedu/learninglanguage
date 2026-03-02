@@ -42,7 +42,7 @@ export async function PATCH(
     })
 
     // Invalidate language cache
-    await redis.del(cacheKeys.language(code))
+    if (redis) await redis.del(cacheKeys.language(code))
     console.log(`🗑️ Invalidated language cache: ${code}`)
     
     revalidatePath('/admin/content/languages')
@@ -83,7 +83,7 @@ export async function DELETE(
     })
 
     // Invalidate language cache
-    await redis.del(cacheKeys.language(code))
+    if (redis) await redis.del(cacheKeys.language(code))
     console.log(`🗑️ Invalidated language cache: ${code}`)
     
     revalidatePath('/admin/content/languages')

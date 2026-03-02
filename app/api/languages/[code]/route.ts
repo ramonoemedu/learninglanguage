@@ -15,7 +15,7 @@ export async function GET(
     const cacheKey = cacheKeys.language(code)
 
     // Check Redis cache first
-    const cached = await redis.get(cacheKey)
+    const cached = redis ? await redis.get(cacheKey) : null
     if (cached) {
       console.log(`✅ Cache HIT for language: ${code}`)
       return NextResponse.json(cached)
@@ -42,7 +42,7 @@ export async function GET(
     }
 
     // Cache the result
-    await redis.setex(cacheKey, cacheTTL.language, language)
+    if (redis) await redis.setex(cacheKey, cacheTTL.language, language)
     console.log(`💾 Cached language: ${code}`)
 
     return NextResponse.json(language)

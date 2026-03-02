@@ -166,7 +166,7 @@ export async function POST(
 
     // Invalidate user progress cache
     const progressCacheKey = cacheKeys.userProgress(authUser.id, langCode)
-    await redis.del(progressCacheKey)
+    if (redis) await redis.del(progressCacheKey)
     console.log(`🗑️ Invalidated user progress cache: ${authUser.id}:${langCode}`)
 
     // 7. Check Chapter Completion & Advancement

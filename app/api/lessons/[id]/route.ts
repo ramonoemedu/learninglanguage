@@ -23,7 +23,7 @@ export async function GET(
     const cacheKey = cacheKeys.lesson(id)
 
     // 1. Check Redis cache first
-    const cached: any = await redis.get(cacheKey)
+    const cached: any = redis ? await redis.get(cacheKey) : null
     if (cached) {
       console.log(`✅ Cache HIT for lesson: ${id}`)
       return NextResponse.json(cached)
@@ -66,7 +66,7 @@ export async function GET(
     }
 
     // 3. Store in Redis with expiration
-    await redis.setex(cacheKey, cacheTTL.lesson, response)
+    if (redis) await redis.setex(cacheKey, cacheTTL.lesson, response)
     console.log(`💾 Cached lesson: ${id}`)
 
     return NextResponse.json(response)
