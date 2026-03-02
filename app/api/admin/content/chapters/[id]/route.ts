@@ -17,6 +17,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+
     const userData = await prisma.user.findUnique({
       where: { id: authUser.id },
       select: { role: true }
@@ -51,6 +53,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+
     const supabase = await createClient()
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 

@@ -13,8 +13,11 @@ export async function POST(request: Request) {
   try {
     // Check if Prisma is available
     if (!prisma) {
-      console.error('Database not available')
-      return NextResponse.json({ error: 'Database connection unavailable' }, { status: 503 })
+      console.error('❌ Prisma database client not initialized - DATABASE_URL may not be configured')
+      return NextResponse.json(
+        { error: 'Database service unavailable. Please ensure DATABASE_URL is set in your Vercel environment variables.' },
+        { status: 503 }
+      )
     }
 
     const body = await request.json()

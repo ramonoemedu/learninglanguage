@@ -19,6 +19,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+
     const { id: chapterId } = await params
     const cacheKey = cacheKeys.chapterLessons(chapterId)
 

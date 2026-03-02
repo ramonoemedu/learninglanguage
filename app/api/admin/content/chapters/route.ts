@@ -15,6 +15,8 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
+    if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+
     const supabase = await createClient()
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
@@ -50,6 +52,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+
     const supabase = await createClient()
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 

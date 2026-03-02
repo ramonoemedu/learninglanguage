@@ -7,8 +7,11 @@ export async function GET() {
   try {
     // Check if Prisma is available
     if (!prisma) {
-      console.error('Database not available')
-      return NextResponse.json({ error: 'Database connection unavailable' }, { status: 503 })
+      console.error('❌ Prisma database client not initialized - DATABASE_URL may not be configured')
+      return NextResponse.json(
+        { error: 'Database service unavailable. Please ensure DATABASE_URL is set in your Vercel environment variables.' },
+        { status: 503 }
+      )
     }
 
     const supabase = await createClient()
@@ -38,7 +41,7 @@ export async function GET() {
       ...user,
       enrolledLanguages: await Promise.all(
         user.userLanguages.map(async (ul) => {
-          const lang = await prisma.language.findUnique({
+          const lang = await prisma!.language.findUnique({
             where: { code: ul.languageCode },
           })
           return { ...ul, language: lang }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
 
 const checkAdmin = async () => {
+  if (!prisma) return null
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic'
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   if (!await checkAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
 
   try {
     const { id } = await params
@@ -31,6 +33,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   if (!await checkAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
 
   try {
     const { id } = await params

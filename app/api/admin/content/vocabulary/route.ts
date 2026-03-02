@@ -6,7 +6,7 @@ const checkAdmin = async () => {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
+  const dbUser = await (prisma ? prisma.user.findUnique({ where: { id: user.id }, select: { role: true } }) : null)
   return dbUser?.role === 'admin' ? user : null
 }
 
@@ -14,6 +14,7 @@ const checkAdmin = async () => {
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
+  if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   if (!await checkAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   
   const { searchParams } = new URL(request.url)
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   if (!await checkAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {

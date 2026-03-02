@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
+    if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
     const languages = await prisma.language.findMany({
       where: { active: true },
       orderBy: { name: 'asc' },

@@ -12,6 +12,8 @@ export async function PATCH(
   { params }: { params: { code: string } }
 ) {
   try {
+    if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+
     const supabase = await createClient()
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
@@ -60,6 +62,8 @@ export async function DELETE(
   { params }: { params: { code: string } }
 ) {
   try {
+    if (!prisma) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+
     const supabase = await createClient()
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
