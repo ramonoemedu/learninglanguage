@@ -10,6 +10,9 @@ const submitSchema = z.object({
   timeSpent: z.number().min(0),
 })
 
+// Force dynamic rendering - don't run at build time
+export const dynamic = 'force-dynamic'
+
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }

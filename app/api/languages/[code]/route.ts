@@ -3,6 +3,9 @@ import { prisma } from '@/lib/db/prisma'
 import { NextResponse } from 'next/server'
 import { redis, cacheKeys, cacheTTL } from '@/lib/cache/redis'
 
+// Force dynamic rendering - don't run at build time
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: Request,
   { params }: { params: { code: string } }
